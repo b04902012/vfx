@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 
 ### I/O ###
 def readImages(dir_name, txt_name):
-    print("Reading images...", end="        ")
+    print("Reading images...")
     with open(dir_name + txt_name, 'r') as f:
         for line in f:
             if line[0] == '#':
@@ -49,13 +49,13 @@ def writeHDRFile(image, filename):
         f.write("#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n".encode())
         f.write(f"-Y {image.shape[0]} +X {image.shape[1]}\n".encode())
 
-        brightest = np.maximum(np.maximum(image[...,0], image[...,1]), image[...,2])
+        brightest = np.maximum(np.maximum(image[...,2], image[...,1]), image[...,0])
         mantissa = np.zeros_like(brightest)
         exponent = np.zeros_like(brightest)
         np.frexp(brightest, mantissa, exponent)
         scaled_mantissa = mantissa * 256.0 / brightest
         rgbe = np.zeros((image.shape[0], image.shape[1], 4), dtype=np.uint8)
-        rgbe[...,0:3] = np.around(image[...,0:3] * scaled_mantissa[...,None])
+        rgbe[...,0:3] = np.around(image[...,::-1] * scaled_mantissa[...,None])
         rgbe[...,3] = np.around(exponent + 128)
 
         rgbe.ravel().tofile(f)
@@ -180,10 +180,11 @@ def computeHDR(dir_name):
     rad_img = np.zeros(imgs[0].shape)    
     print("image shape:", imgs[0].shape)
 
-    color = ['red', 'green', 'blue']
+    color = ['blue', 'green', 'red']
     responseCurve = []
     for i in range(3):
-        print(color[i])
+        print()
+        print("=====", color[i], "=====")
         samples = getSamples(channels[i])
 #       print(log_t)
         responseCurve.append(getResponseCurve(samples, log_t, 100, weight))
