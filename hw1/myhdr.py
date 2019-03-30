@@ -23,7 +23,7 @@ def readImages(dir_name, txt_name):
 
         filenames = [content[0] for content in contents]
         log_t = list(map(float, [content[1] for content in contents]))
-        log_t = np.log2(log_t)
+        log_t = -np.log2(log_t)
         [print("-", f) for f in filenames]
 
     # cv2.imread flag: grayscale -> =0, BGR -> >0
