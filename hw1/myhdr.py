@@ -2,13 +2,14 @@ import numpy as np
 import cv2
 import random
 import pickle
+import os
 from matplotlib import pyplot as plt
 
 
 ### I/O ###
 def readImages(dir_name, txt_name):
     print("Reading images...")
-    with open(dir_name + txt_name, 'r') as f:
+    with open(os.path.join(dir_name,txt_name), 'r') as f:
         for line in f:
             if line[0] == '#':
                 continue
@@ -23,7 +24,7 @@ def readImages(dir_name, txt_name):
 
         filenames = [content[0] for content in contents]
         log_t = list(map(float, [content[1] for content in contents]))
-        log_t = np.log2(log_t)
+        log_t = -np.log2(log_t)
         [print("-", f) for f in filenames]
 
     # cv2.imread flag: grayscale -> =0, BGR -> >0
@@ -144,7 +145,8 @@ def getResponseCurve(Z, log_t, smooth_lambda, weighting_func, z_min = 0, z_max =
     x = np.linalg.lstsq(A, B)[0]
 
     g = x[:n]
-    print(x[n//2])
+    #print(g[:, 0] == 0)
+    #print(np.any(g[:, 0] == 0))
     return g[:, 0]
 
 
@@ -156,7 +158,6 @@ def getRadianceMap(images, log_t, response_curve, weighting_func):
 
     for r in range(rows):
         for c in range(cols):
-            log_e = 0
             weight = np.array([weighting_func(images[i][r, c]) for i in range(nImages)])
             weight_sum = np.sum(weight)
             log_e = np.array([response_curve[images[i][r, c]] - log_t[i] for i in range(nImages)])
@@ -167,6 +168,7 @@ def getRadianceMap(images, log_t, response_curve, weighting_func):
             else:
                 weighted_e = response_curve[images[nImages//2][r, c]] - log_t[nImages//2]
             rad_img[r, c] = 2 ** weighted_e
+
 #            print(log_e)
 #            rad_img[r, c] = log_e
     print("done.")
@@ -203,10 +205,10 @@ def computeHDR(dir_name):
     plt.savefig(f'{dir_name}/curve_{4}.png')
     plt.clf()
     
-    with open(dir_name+'/'+dir_name+'_rad', 'wb') as f:
+    with open(os.path.join(dir_name, dir_name+'_rad'), 'wb') as f:
         pickle.dump(rad_img, f)
 
-    writeHDRFile(rad_img, dir_name+'/'+dir_name)
+    writeHDRFile(rad_img, os.path.join(dir_name, dir_name))
     
 
     '''
@@ -219,7 +221,7 @@ def computeHDR(dir_name):
             print(rad_img[r, c:c+5])
     '''
     
-    cv2.imwrite(dir_name+'/'+dir_name+'.png',rad_img)
+    cv2.imwrite(os.path.join(dir_name, dir_name+'.png'), rad_img)
 #    cv2.imshow('image',rad_img)
 #    k = cv2.waitKey(0)
     cv2.destroyAllWindows()
@@ -248,8 +250,8 @@ def photographic(rad_img, key_value = 0.18, multi_value = 1):
     print(np.amax(L_d))
     print(np.amin(L_d))
 
-    tone_mapped_img = rad_img * L_w
-    channels = [np.expand_dims(tone_mapped_img[:, :, i]/L_d, 2) for i in range(3)]
+    #tone_mapped_img = rad_img * L_w
+    channels = [np.expand_dims(rad_img[:, :, i]*L_d, 2) for i in range(3)]
 
     tone_mapped_img = np.concatenate(channels, 2)
 
