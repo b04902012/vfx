@@ -23,21 +23,15 @@ def readImages(dir_name, txt_name):
 
         filenames = [content[0] for content in contents]
         log_t = list(map(float, [content[1] for content in contents]))
-        log_t = -np.log2(log_t)
+        log_t = np.log2(log_t)
         [print("-", f) for f in filenames]
 
-    # grayscale -> 0
-    # RGB -> >0
-    imgs = []
-    for f in filenames:
-        raw_image = cv2.imread(dir_name+f.replace("ppm", "png"), 1)
-        r_rate = round(max(raw_image.shape)/1000)
-        resized_image = cv2.resize(raw_image, (0, 0), fx=1/r_rate, fy=1/r_rate, interpolation=cv2.INTER_AREA)
-        imgs.append(resized_image)
-    #   printFigure(img[-1])
+    # cv2.imread flag: grayscale -> =0, BGR -> >0
+    imgs            = [cv2.imread(dir_name+f.replace("ppm", "png"), 1) for f in filenames]
+    resized_imgs    = [cv2.resize(img, (0, 0), fx=1/round(max(img.shape)/1000), fy=1/round(max(img.shape)/1000), interpolation=cv2.INTER_AREA) for img in imgs]
 
     print("done.\n")
-    return imgs, log_t
+    return resized_imgs, log_t
 
 def loadHDR(filename):
     with open(filename, 'rb') as f:
@@ -83,6 +77,10 @@ def weight(pixel):
 
 
 def getSamples(images, z_min = 0, z_max = 255):
+    '''
+    return np.array of shape(nSamples, nImages)
+    '''
+
     z_range = z_max - z_min + 1
     nImages = len(images)
     nSamples = z_range
@@ -101,7 +99,7 @@ def getSamples(images, z_min = 0, z_max = 255):
     '''
     mid_img = images[nImages // 2]
 
-    for i in range(z_range):
+    for i in range(nSamples):
         rows, cols = np.where(mid_img == i)
         if len(rows) != 0:
             idx = random.randrange(len(rows))
@@ -128,7 +126,7 @@ def getResponseCurve(Z, log_t, smooth_lambda, weighting_func, z_min = 0, z_max =
     for i in range(nSamples):
         for j in range(nImages):
             w_ij = weighting_func(Z[i, j]+1)
-            A[k, Z[i, j]+1] = w_ij
+            A[k, Z[i, j]] = w_ij
             A[k, n+i] = -w_ij
             B[k, 0] = w_ij * log_t[j]
             k += 1
@@ -137,15 +135,15 @@ def getResponseCurve(Z, log_t, smooth_lambda, weighting_func, z_min = 0, z_max =
     k += 1
 
     for i in range(n-2):
-        A[k, i] = smooth_lambda * weighting_func(i+1)
-        A[k, i+1] = -2 * smooth_lambda * weighting_func(i+1)
-        A[k, i+2] = smooth_lambda * weighting_func(i+1)
+        tmp = smooth_lambda * weighting_func(i+1)
+        A[k, i]     = tmp
+        A[k, i+1]   = -2 * tmp
+        A[k, i+2]   = tmp
         k += 1
 
-    invA = np.linalg.pinv(A)
-    x = np.dot(invA, B)
+    x = np.linalg.lstsq(A, B)[0]
 
-    g = x[0:n]
+    g = x[:n]
     print(x[n//2])
     return g[:, 0]
 
@@ -188,7 +186,7 @@ def computeHDR(dir_name):
         samples = getSamples(channels[i])
 #       print(log_t)
         responseCurve.append(getResponseCurve(samples, log_t, 100, weight))
-#       print(responseCurve[i])
+#       print(responseCurve[i][128])
         plt.plot(responseCurve[i], np.arange(256), c=color[i])
         plt.savefig(f'{dir_name}/curve_{i+1}.png')
         plt.clf()
