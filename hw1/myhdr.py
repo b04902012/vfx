@@ -3,36 +3,12 @@ import cv2
 import random
 import pickle
 import os
+import math
+from scipy import signal
+from scipy.ndimage import gaussian_filter
 from matplotlib import pyplot as plt
+from tqdm import tqdm
 
-
-### I/O ###
-def readImages(dir_name, txt_name):
-    print("Reading images...")
-    with open(os.path.join(dir_name,txt_name), 'r') as f:
-        for line in f:
-            if line[0] == '#':
-                continue
-            num_img = int(line)
-            break
-
-        contents = []
-        for line in f:
-            if line[0] == '#':
-                continue
-            contents.append(line.split())
-
-        filenames = [content[0] for content in contents]
-        log_t = list(map(float, [content[1] for content in contents]))
-        log_t = -np.log2(log_t)
-        [print("-", f) for f in filenames]
-
-    # cv2.imread flag: grayscale -> =0, BGR -> >0
-    imgs            = [cv2.imread(dir_name+f.replace("ppm", "png"), 1) for f in filenames]
-    resized_imgs    = [cv2.resize(img, (0, 0), fx=1/round(max(img.shape)/1000), fy=1/round(max(img.shape)/1000), interpolation=cv2.INTER_AREA) for img in imgs]
-
-    print("done.\n")
-    return resized_imgs, log_t
 
 def loadHDR(filename):
     with open(filename, 'rb') as f:
@@ -79,7 +55,8 @@ def weight(pixel):
 
 def getSamples(images, z_min = 0, z_max = 255):
     '''
-    return np.array of shape(nSamples, nImages)
+    * return
+    numpy array of shape(nSamples, nImages)
     '''
 
     z_range = z_max - z_min + 1
@@ -169,13 +146,13 @@ def getRadianceMap(images, log_t, response_curve, weighting_func):
                 weighted_e = response_curve[images[nImages//2][r, c]] - log_t[nImages//2]
             rad_img[r, c] = 2 ** weighted_e
 
-#            print(log_e)
-#            rad_img[r, c] = log_e
     print("done.")
     return rad_img
 
-def computeHDR(dir_name):
-    imgs, log_t = readImages(dir_name+'/', '.hdr_image_list.txt')
+def computeHDR(dir_name, imgs, log_t):
+    # resize images
+    imgs    = [cv2.resize(img, (0, 0), fx=1/round(max(img.shape)/1000), fy=1/round(max(img.shape)/1000), interpolation=cv2.INTER_AREA) for img in imgs]
+    # split into BGR
     channels = [[img[:, :, i] for img in imgs] for i in range(3)]
     rad_img = np.zeros(imgs[0].shape)    
     print("image shape:", imgs[0].shape)
@@ -231,33 +208,91 @@ def computeHDR(dir_name):
 
 
 ### tone mapping ###
-def photographic(rad_img, key_value = 0.18, multi_value = 1):
-    '''
-    rad_img: (rowls, cols, 3)
-    '''
+
+### convert into grey scale ###
+def toGrayScale(color_img):
+    return 0.27 * color_img[:, :, 2] + 0.67 * color_img[:, :, 1] + 0.06 * color_img[:, :, 0]
+
+def toLuminance(img, key_value):
     delta   = 0.001
-
-    Lw      = 0.27*rad_img[:, :, 0] + 0.67*rad_img[:, :, 1] + 0.06*rad_img[:, :, 2]
-    #Lw = 0.3*rad_img[:, :, 0] + 0.59*rad_img[:, :, 1] + 0.11*rad_img[:, :, 2]
+    Lw      = toGrayScale(img)
     L_w  = np.log2(delta + Lw)
-
-    L_w     = np.exp2(np.sum(L_w)/rad_img.shape[0]/rad_img.shape[1], out=L_w)
-    print(L_w)
+    L_w     = np.exp2(np.sum(L_w)/img.shape[0]/img.shape[1], out=L_w)
     L_m     = key_value / L_w * Lw
+
+    return Lw, L_m
+
+def gaussianBlur(img, sigma):
+    #print('max in img:', np.amax(img))
+    blurred = gaussian_filter(img, sigma=sigma)
+    #print('max in blurred:', np.amax(blurred))
+
+    return blurred
+
+def photographicGlobal(rad_img, key_value = 0.18, multi_value = 1):
+    '''
+    * args *
+    
+    rad_img:      numpy array with shape (rowls, cols, 3)
+    key_value:    a
+    '''
+    Lw, L_m = toLuminance(rad_img, key_value)
     L_white = np.amax(L_m)
     L_d     = L_m * (1 + L_m/(L_white ** 2)) / (1 + L_m)
     print(L_d)
     print(np.amax(L_d))
     print(np.amin(L_d))
 
-    #tone_mapped_img = rad_img * L_w
-    channels = [np.expand_dims(rad_img[:, :, i]*L_d, 2) for i in range(3)]
+    channels = [np.expand_dims(rad_img[:, :, i]/Lw*L_d, 2) for i in range(3)]
 
     tone_mapped_img = np.concatenate(channels, 2)
 
     # adjust intensity
     tone_mapped_img *= 128 / np.average(tone_mapped_img) * multi_value
 
-#    printFigure(tone_mapped_img)
+    return tone_mapped_img
+
+def computeV(L, x, y, s, phi, key_value):
+    sqrt2 = math.sqrt(2)
+    alpha = [1 / 2 / sqrt2, 1.6 / 2 / sqrt2]
+
+    V_i = lambda x, y, s, i: gaussianBlur(L, alpha[i]*s/sqrt2)[y][x]
+
+    V1 = V_i(x, y, s, 0)
+    V2 = V_i(x, y, s, 1)
+
+    return (V1 - V2)/(2**phi * key_value / s**2 + V1), V1
+
+
+def photographicLocal(rad_img, phi=8, key_value=1.8):
+    eps = 0.05
+
+    Lw, L_m = toLuminance(rad_img, key_value)
+    maxV1   = np.zeros(rad_img.shape)
+
+    for y in tqdm(range(rad_img.shape[0])):
+        for x in range(rad_img.shape[1]):
+            s = 1
+            maxV = Lw
+            while s <= 43:
+                delta, V1 = computeV(Lw, y, x, s, phi, key_value)
+                if abs(delta) < eps:
+                    maxV = V1
+                else:
+                    break
+                s *= 1.6
+            maxV1[y][x] = maxV
+
+    L_d     = L_m / (1 + maxV1)
+    print(L_d)
+    print(np.amax(L_d))
+    print(np.amin(L_d))
+
+    channels = [np.expand_dims(rad_img[:, :, i]/Lw*L_d, 2) for i in range(3)]
+    tone_mapped_img = np.concatenate(channels, 2)
 
     return tone_mapped_img
+
+
+
+
