@@ -66,8 +66,12 @@ if __name__ == '__main__':
         if len(inputs) > 2:
             phi = float(inputs[2])
 
-        tone_mapped = hdr.photographicGlobal(rad_img, key_value, multi_value)
-        tone_mapped = hdr.photographicLocal(rad_img, key_value, multi_value, phi)
+        local = False
+        if input('Do global or local? [g/l] ') in 'Gg':
+            tone_mapped = hdr.photographicGlobal(rad_img, key_value, multi_value)
+        else:
+            local = True
+            tone_mapped = hdr.photographicLocal(rad_img, key_value, multi_value, phi)
         blurred = hdr.gaussianBlur(tone_mapped, 4)
 
         print()
@@ -75,8 +79,10 @@ if __name__ == '__main__':
         print('max:', np.amax(tone_mapped))
         print('min:', np.amin(tone_mapped))
 
-        cv2.imwrite(os.path.join(dir_name, dir_name+f'_toned_{key_value}_{multi_value}_{phi}.png'), tone_mapped)
+        if(local):
+            cv2.imwrite(os.path.join(dir_name, dir_name+f'_toned_{key_value}_{multi_value}_{phi}.png'), tone_mapped)
+        else:
+            cv2.imwrite(os.path.join(dir_name, dir_name+f'_toned_{key_value}_{multi_value}.png'), tone_mapped)
         cv2.imwrite(os.path.join(dir_name, dir_name+f'_blurred.png'), blurred)
         
         print(f'Save image to', os.path.join(dir_name, dir_name+f'_toned_{key_value}_{multi_value}_{phi}.png'))
-        
