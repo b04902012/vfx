@@ -216,7 +216,7 @@ def toGrayScale(color_img):
 def toLuminance(img, key_value):
     delta   = 0.001
     Lw      = toGrayScale(img)
-    L_w  = np.log2(delta + Lw)
+    L_w     = np.log2(delta + Lw)
     L_w     = np.exp2(np.sum(L_w)/img.shape[0]/img.shape[1], out=L_w)
     L_m     = key_value / L_w * Lw
 
@@ -252,8 +252,18 @@ def photographicGlobal(rad_img, key_value = 0.18, multi_value = 1):
 
     tone_mapped_img = np.concatenate(channels, 2)
 
+    print()
+    print('After tone mapping:')
+    print('max:', np.amax(tone_mapped_img))
+    print('min:', np.amin(tone_mapped_img))
+
     # adjust intensity
-    tone_mapped_img *= 128 / np.average(tone_mapped_img) * multi_value
+    tone_mapped_img *= 100 / np.average(tone_mapped_img) * multi_value
+
+
+    print(Lw[200][200], L_d[200][200])
+    print(Lw[300][300], L_d[300][300])
+    print(Lw[400][400], L_d[400][400])
 
     return tone_mapped_img
 
@@ -266,8 +276,8 @@ def computeV(x, y, gaussian, phi, key_value):
     return (V1 - V2)/(2**phi * key_value / gaussian[0]**2 + V1), V1
 
 
-def photographicLocal(rad_img, phi=8, key_value=1.8):
-    eps = 0.05
+def photographicLocal(rad_img, key_value=1.8, multi_value=1, phi=8):
+    eps = 5
 
     Lw, L_m = toLuminance(rad_img, key_value)
     maxV1   = np.zeros(Lw.shape)
@@ -301,6 +311,11 @@ def photographicLocal(rad_img, phi=8, key_value=1.8):
 
     channels = [np.expand_dims(rad_img[:, :, i]/Lw*L_d, 2) for i in range(3)]
     tone_mapped_img = np.concatenate(channels, 2)
+    tone_mapped_img *= 100 / np.average(tone_mapped_img) * multi_value
+
+    print(Lw[200][200], L_d[200][200])
+    print(Lw[300][300], L_d[300][300])
+    print(Lw[400][400], L_d[400][400])
 
     return tone_mapped_img
 

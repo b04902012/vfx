@@ -53,18 +53,21 @@ if __name__ == '__main__':
         print('min:', np.amin(rad_img))
         print()
 
-        inputs = input('Please input key value and multi value: ').split()
+        inputs = input('Please input key value (0.18), multi value (1), and phi: ').split()
 
         key_value = 0.18
         multi_value = 1
+        phi = 8
 
         if len(inputs) > 0:
             key_value = float(inputs[0])
         if len(inputs) > 1:
             multi_value = float(inputs[1])
+        if len(inputs) > 2:
+            phi = float(inputs[2])
 
-        #tone_mapped = hdr.photographicGlobal(rad_img, key_value, multi_value)
-        tone_mapped = hdr.photographicLocal(rad_img, phi=8, key_value=1.8)
+        tone_mapped = hdr.photographicGlobal(rad_img, key_value, multi_value)
+        tone_mapped = hdr.photographicLocal(rad_img, key_value, multi_value, phi)
         blurred = hdr.gaussianBlur(tone_mapped, 4)
 
         print()
@@ -72,8 +75,8 @@ if __name__ == '__main__':
         print('max:', np.amax(tone_mapped))
         print('min:', np.amin(tone_mapped))
 
-        cv2.imwrite(os.path.join(dir_name, dir_name+f'_toned_{key_value}_{multi_value}.png'), tone_mapped)
+        cv2.imwrite(os.path.join(dir_name, dir_name+f'_toned_{key_value}_{multi_value}_{phi}.png'), tone_mapped)
         cv2.imwrite(os.path.join(dir_name, dir_name+f'_blurred.png'), blurred)
         
-        print(f'Save image to', os.path.join(dir_name, dir_name+f'_toned_{key_value}_{multi_value}.png'))
+        print(f'Save image to', os.path.join(dir_name, dir_name+f'_toned_{key_value}_{multi_value}_{phi}.png'))
         
