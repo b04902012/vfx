@@ -7,7 +7,12 @@ import math
 from scipy import signal
 from scipy.ndimage import gaussian_filter
 from matplotlib import pyplot as plt
-from tqdm import tqdm
+
+try:
+    from tqdm import tqdm
+    tqdm_exist = true
+except:
+    pass
 
 
 def loadHDR(filename):
@@ -128,7 +133,7 @@ def getResponseCurve(Z, log_t, smooth_lambda, weighting_func, z_min = 0, z_max =
 
 
 def getRadianceMap(images, log_t, response_curve, weighting_func):
-    print("Computing radiance map......", end="         ")
+    print("Computing radiance map...", end="         ")
     rows, cols = images[0].shape
     rad_img = np.zeros((rows, cols))
     nImages = len(images)
@@ -276,16 +281,14 @@ def computeV(x, y, gaussian, phi, key_value):
     return (V1 - V2)/(2**phi * key_value / gaussian[0]**2 + V1), V1
 
 
-def photographicLocal(rad_img, key_value=1.8, multi_value=1, phi=8):
-    eps = 5
-
+def photographicLocal(rad_img, key_value, multi_value, eps, s, phi):
     Lw, L_m = toLuminance(rad_img, key_value)
     maxV1   = np.zeros(Lw.shape)
 
     sqrt2 = math.sqrt(2)
     alpha = [1 / 2 / sqrt2, 1.6 / 2 / sqrt2]
     gaussians = []       # (s, [img_alpha1, img_alpha2])
-    s = 1
+ 
     for _ in range(8):
         gaussians.append((s, [gaussianBlur(Lw, alpha[i]*s/sqrt2) for i in range(2)]))
         s *= 1.6
@@ -299,6 +302,7 @@ def photographicLocal(rad_img, key_value=1.8, multi_value=1, phi=8):
                 if abs(delta) < eps:
                     maxV = V1
                 else:
+                    #print(gaussian[0])
                     break
             maxV1[y][x] = maxV
 

@@ -25,7 +25,7 @@ def saveBoolImage(img, name):
 
 ### image aligning ###
 def alignImages(imgs, num_shift):
-    print("aligning...")
+    print("Aligning...")
     grey_imgs = [toGrayScale(img) for img in imgs]
     thres_imgs = [toThresholdImage(img) for img in grey_imgs]
     mask_imgs = [toMaskImage(img) for img in grey_imgs]
@@ -38,7 +38,7 @@ def alignImages(imgs, num_shift):
         shift_x = 0
         shift_y = 0
         num_shift = n
-        print("aligning image ", i)
+        print("- aligning image ", i)
         while(num_shift >= 0):
             min_x = 0
             min_y = 0
@@ -61,4 +61,5 @@ def alignImages(imgs, num_shift):
             num_shift=num_shift-1
         print("Shift: ",(shift_x, shift_y))
         aligned_images.append(np.roll(imgs[i], (shift_x,shift_y), (0,1))[2**(n+1):-(2**(n+1)),2**(n+1):-(2**(n+1))])
+    print("done.")
     return aligned_images

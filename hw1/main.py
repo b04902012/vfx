@@ -53,16 +53,27 @@ if __name__ == '__main__':
         print('min:', np.amin(rad_img))
         print()
 
-        inputs = input('Please input key value (0.18), multi value (1), and phi: ').split()
 
+        # default value
         key_value = 0.18
         multi_value = 1
+        eps = 1
+        s = 1
         phi = 8
+
+        inputs = input('Please input key value (0.18), multi value (1): ').split()
 
         if len(inputs) > 0:
             key_value = float(inputs[0])
         if len(inputs) > 1:
             multi_value = float(inputs[1])
+
+        inputs = input('Please input epsilon (1), s (1), phi (8): ').split()
+
+        if len(inputs) > 0:
+            eps = float(inputs[0])
+        if len(inputs) > 1:
+            s = float(inputs[1])
         if len(inputs) > 2:
             phi = float(inputs[2])
 
@@ -72,10 +83,10 @@ if __name__ == '__main__':
             tone_mapped = hdr.photographicGlobal(rad_img, key_value, multi_value)
         elif command in 'Ll':
             local = True
-            tone_mapped = hdr.photographicLocal(rad_img, key_value, multi_value, phi)
+            tone_mapped = hdr.photographicLocal(rad_img, key_value, multi_value, eps, s, phi)
         else:
             local = True
-            tone_mapped = 0.3 * hdr.photographicLocal(rad_img, key_value, multi_value, phi)\
+            tone_mapped = 0.3 * hdr.photographicLocal(rad_img, key_value, multi_value, eps, s, phi)\
                         + 0.7 * hdr.photographicGlobal(rad_img, key_value, multi_value)
         blurred = hdr.gaussianBlur(tone_mapped, 4)
 
@@ -85,9 +96,9 @@ if __name__ == '__main__':
         print('min:', np.amin(tone_mapped))
 
         if(local):
-            cv2.imwrite(os.path.join(dir_name, dir_name+f'_toned_{key_value}_{multi_value}_{phi}.png'), tone_mapped)
+            cv2.imwrite(os.path.join(dir_name, dir_name+f'_toned_{key_value}_{multi_value}_{eps}_{s}_{phi}.png'), tone_mapped)
         else:
             cv2.imwrite(os.path.join(dir_name, dir_name+f'_toned_{key_value}_{multi_value}.png'), tone_mapped)
         cv2.imwrite(os.path.join(dir_name, dir_name+f'_blurred.png'), blurred)
         
-        print(f'Save image to', os.path.join(dir_name, dir_name+f'_toned_{key_value}_{multi_value}_{phi}.png'))
+        print(f'Save image to', os.path.join(dir_name, dir_name+f'_toned_h_{key_value}_{multi_value}_{eps}_{s}_{phi}.png'))
