@@ -24,7 +24,7 @@ def saveBoolImage(img, name):
     cv2.imwrite(name, (img*255).astype(int))
 
 ### image aligning ###
-def alignImage(imgs, num_shift):
+def alignImages(imgs, num_shift):
     print("aligning...")
     grey_imgs = [toGrayScale(img) for img in imgs]
     thres_imgs = [toThresholdImage(img) for img in grey_imgs]
