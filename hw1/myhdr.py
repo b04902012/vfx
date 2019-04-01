@@ -220,6 +220,11 @@ def toLuminance(img, key_value):
     L_w     = np.exp2(np.sum(L_w)/img.shape[0]/img.shape[1], out=L_w)
     L_m     = key_value / L_w * Lw
 
+    print("Lw:")
+    print(np.amax(Lw))
+    print(np.amin(Lw))
+    print()
+
     return Lw, L_m
 
 def gaussianBlur(img, sigma):
@@ -252,41 +257,47 @@ def photographicGlobal(rad_img, key_value = 0.18, multi_value = 1):
 
     return tone_mapped_img
 
-def computeV(L, x, y, s, phi, key_value):
-    sqrt2 = math.sqrt(2)
-    alpha = [1 / 2 / sqrt2, 1.6 / 2 / sqrt2]
+def computeV(x, y, gaussian, phi, key_value):
+    V_i = lambda x, y, i: gaussian[1][i][y][x]
 
-    V_i = lambda x, y, s, i: gaussianBlur(L, alpha[i]*s/sqrt2)[y][x]
+    V1 = V_i(x, y, 0)
+    V2 = V_i(x, y, 1)
 
-    V1 = V_i(x, y, s, 0)
-    V2 = V_i(x, y, s, 1)
-
-    return (V1 - V2)/(2**phi * key_value / s**2 + V1), V1
+    return (V1 - V2)/(2**phi * key_value / gaussian[0]**2 + V1), V1
 
 
 def photographicLocal(rad_img, phi=8, key_value=1.8):
     eps = 0.05
 
     Lw, L_m = toLuminance(rad_img, key_value)
-    maxV1   = np.zeros(rad_img.shape)
+    maxV1   = np.zeros(Lw.shape)
+
+    sqrt2 = math.sqrt(2)
+    alpha = [1 / 2 / sqrt2, 1.6 / 2 / sqrt2]
+    gaussians = []       # (s, [img_alpha1, img_alpha2])
+    s = 1
+    for _ in range(8):
+        gaussians.append((s, [gaussianBlur(Lw, alpha[i]*s/sqrt2) for i in range(2)]))
+        s *= 1.6
+
 
     for y in tqdm(range(rad_img.shape[0])):
         for x in range(rad_img.shape[1]):
-            s = 1
-            maxV = Lw
-            while s <= 43:
-                delta, V1 = computeV(Lw, y, x, s, phi, key_value)
+            maxV = Lw[y][x]
+            for gaussian in gaussians:
+                delta, V1 = computeV(x, y, gaussian, phi, key_value)
                 if abs(delta) < eps:
                     maxV = V1
                 else:
                     break
-                s *= 1.6
             maxV1[y][x] = maxV
 
     L_d     = L_m / (1 + maxV1)
+    print("L_d:")
     print(L_d)
     print(np.amax(L_d))
     print(np.amin(L_d))
+    print()
 
     channels = [np.expand_dims(rad_img[:, :, i]/Lw*L_d, 2) for i in range(3)]
     tone_mapped_img = np.concatenate(channels, 2)

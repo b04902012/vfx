@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 import myhdr as hdr
+import myalign as align
 import os
 import pickle
 import sys
@@ -43,12 +44,14 @@ if __name__ == '__main__':
         rad_img = hdr.loadHDR(os.path.join(dir_name, dir_name+'_rad'))
     else:
         imgs, log_t = readImages(dir_name+'/', '.hdr_image_list.txt')
+        imgs = align.alignImages(imgs, 6)
         rad_img = hdr.computeHDR(dir_name, imgs, log_t)
 
     if input('Do tone mapping? [y/n] ') in 'Yy':
-        
-        print(np.amax(rad_img))
-        print(np.amin(rad_img))
+        print('Before tone mapping:')
+        print('max:', np.amax(rad_img))
+        print('min:', np.amin(rad_img))
+        print()
 
         inputs = input('Please input key value and multi value: ').split()
 
@@ -59,12 +62,15 @@ if __name__ == '__main__':
             key_value = float(inputs[0])
         if len(inputs) > 1:
             multi_value = float(inputs[1])
+
         #tone_mapped = hdr.photographicGlobal(rad_img, key_value, multi_value)
         tone_mapped = hdr.photographicLocal(rad_img, phi=8, key_value=1.8)
         blurred = hdr.gaussianBlur(tone_mapped, 4)
 
-        print(np.amax(tone_mapped))
-        print(np.amin(tone_mapped))
+        print()
+        print('After tone mapping:')
+        print('max:', np.amax(tone_mapped))
+        print('min:', np.amin(tone_mapped))
 
         cv2.imwrite(os.path.join(dir_name, dir_name+f'_toned_{key_value}_{multi_value}.png'), tone_mapped)
         cv2.imwrite(os.path.join(dir_name, dir_name+f'_blurred.png'), blurred)
