@@ -67,11 +67,16 @@ if __name__ == '__main__':
             phi = float(inputs[2])
 
         local = False
-        if input('Do global or local? [g/l] ') in 'Gg':
+        command = input('Do global or local or hybrid? [g/l/h] ')
+        if command in 'Gg':
             tone_mapped = hdr.photographicGlobal(rad_img, key_value, multi_value)
-        else:
+        elif command in 'Ll':
             local = True
             tone_mapped = hdr.photographicLocal(rad_img, key_value, multi_value, phi)
+        else:
+            local = True
+            tone_mapped = 0.3 * hdr.photographicLocal(rad_img, key_value, multi_value, phi)\
+                        + 0.7 * hdr.photographicGlobal(rad_img, key_value, multi_value)
         blurred = hdr.gaussianBlur(tone_mapped, 4)
 
         print()
