@@ -78,6 +78,7 @@ if __name__ == '__main__':
             phi = float(inputs[2])
 
         local = False
+        hybrid = False
         command = input('Do global or local or hybrid? [g/l/h] ')
         if command in 'Gg':
             tone_mapped = hdr.photographicGlobal(rad_img, key_value, multi_value)
@@ -85,7 +86,7 @@ if __name__ == '__main__':
             local = True
             tone_mapped = hdr.photographicLocal(rad_img, key_value, multi_value, eps, s, phi)
         else:
-            local = True
+            hybrid = True
             tone_mapped = 0.3 * hdr.photographicLocal(rad_img, key_value, multi_value, eps, s, phi)\
                         + 0.7 * hdr.photographicGlobal(rad_img, key_value, multi_value)
         blurred = hdr.gaussianBlur(tone_mapped, 4)
@@ -95,10 +96,14 @@ if __name__ == '__main__':
         print('max:', np.amax(tone_mapped))
         print('min:', np.amin(tone_mapped))
 
-        if(local):
-            cv2.imwrite(os.path.join(dir_name, dir_name+f'_toned_{key_value}_{multi_value}_{eps}_{s}_{phi}.png'), tone_mapped)
+        if local:
+            output_name = os.path.join(dir_name, f'{dir_name}_toned_{key_value}_{multi_value}_{eps}_{s}_{phi}.png')
+            
+        elif hybrid:
+            output_name = os.path.join(dir_name, f'{dir_name}_toned_h_{key_value}_{multi_value}_{eps}_{s}_{phi}.png')
         else:
-            cv2.imwrite(os.path.join(dir_name, dir_name+f'_toned_{key_value}_{multi_value}.png'), tone_mapped)
-        cv2.imwrite(os.path.join(dir_name, dir_name+f'_blurred.png'), blurred)
+            output_name = os.path.join(dir_name, f'{dir_name}_toned_{key_value}_{multi_value}.png')
+        cv2.imwrite(output_name, tone_mapped)
+        cv2.imwrite(os.path.join(dir_name, f'{dir_name}_blurred.png'), blurred)
         
-        print(f'Save image to', os.path.join(dir_name, dir_name+f'_toned_h_{key_value}_{multi_value}_{eps}_{s}_{phi}.png'))
+        print('Save image to', output_name)
