@@ -10,17 +10,33 @@ from matplotlib import pyplot as plt
 
 try:
     from tqdm import tqdm
-    tqdm_exist = true
+    tqdm_exist = True
 except:
-    pass
+    tqdm_exist = False
 
+
+### HDR ###
 
 def loadHDR(filename):
+    """ Load existent radiance map (in pickle format)
+    
+    Args:
+        filename (str)
+    
+    Returns:
+        numpy.array((height, width, nChannels), dtype=float): A radiance map with shape (h, w, 3)
+    """
     with open(filename, 'rb') as f:
         rad_img = pickle.load(f)
     return rad_img
 
 def writeHDRFile(image, filename):
+    """ Save image to .hdr format
+    
+    Args:
+        image (numpy.array((height, width, nChannels), dtype=float)): The computed radiance map in B, G, R order
+        filename (str): Output filename (without the .hdr extention)
+    """
     with open(filename+".hdr", "wb") as f:
         f.write("#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n".encode())
         f.write(f"-Y {image.shape[0]} +X {image.shape[1]}\n".encode())
@@ -35,9 +51,14 @@ def writeHDRFile(image, filename):
         rgbe[...,3] = np.around(exponent + 128)
 
         rgbe.ravel().tofile(f)
-    return rgbe
+    return
 
 def printFigure(img):
+    """ For debugging purpose
+    
+    Args:
+        img (numpy.array)
+    """
     for r in range(0, img.shape[0], 10):
         for c in range(0, img.shape[1], 20):
             print(img[r, c:c+5])
@@ -50,8 +71,15 @@ def printFigure(img):
     k = cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-### HDR ###
 def weight(pixel):
+    """ Assign weight for every pixel
+    
+    Args:
+        pixel (int): 0~255
+    
+    Returns:
+        int: weight
+    """
     z_min, z_max = 0, 255
     if pixel <= (z_min+z_max) / 2:
         return pixel - z_min
@@ -59,40 +87,57 @@ def weight(pixel):
 
 
 def getSamples(images, z_min = 0, z_max = 255):
-    '''
-    * return
-    numpy array of shape(nSamples, nImages)
-    '''
+    """ According to the middle image, choose one pixel for each pixel possible value 
+        and return the pixels from all series of images.
+    Args:
+        images (numpy.array((nImages, height, width), dtype=uint8)): 
+            images with different exposures
+        z_min (int, optional): 
+            minimum of possible pixel value
+        z_max (int, optional): 
+            maximum of possible pixel value
+    
+    Returns:
+        numpy.array((nSamples, nImages), dtype=uint8): sampled pixels
+    """
 
     z_range = z_max - z_min + 1
     nImages = len(images)
     nSamples = z_range
     intensity_values = np.zeros((nSamples, nImages), dtype=np.uint8)
 
-    '''
-    rows = np.random.randint(images[0].shape[0], size=(nSamples))
-    cols = np.random.randint(images[0].shape[1], size=(nSamples))
-    
-    for i in range(len(rows)):
-        for j in range(nImages):
-            intensity_values[i, j] = images[j][rows[i], cols[i]]
-
-    return intensity_values
-    
-    '''
     mid_img = images[nImages // 2]
 
     for i in range(nSamples):
-        rows, cols = np.where(mid_img == i)
-        if len(rows) != 0:
-            idx = random.randrange(len(rows))
+        height, width = np.where(mid_img == i)
+        if len(height) != 0:
+            idx = random.randrange(len(height))
             for j in range(nImages):
-                intensity_values[i, j] = images[j][rows[idx], cols[idx]]
+                intensity_values[i, j] = images[j][height[idx], width[idx]]
     return intensity_values
     
 
 
 def getResponseCurve(Z, log_t, smooth_lambda, weighting_func, z_min = 0, z_max = 255):
+    """ Recover response curve for a single channel
+    
+    Args:
+        Z (numpy.array((nSamples, nImages), dtype=uint8)): 
+            sampled pixels
+        log_t (float): 
+            log of shutter speed
+        smooth_lambda (float): 
+            scalar that weights the smoothness term relative to the data fitting term
+        weighting_func (function): 
+            decides the weight for each pixel value from different images
+        z_min (int, optional): 
+            minimum of possible pixel value
+        z_max (int, optional): 
+            maximum of possible pixel value
+    
+    Returns:
+        numpy.array((z_max-z_min+1), dtype=float): response curve that maps z_min ~ z_max to logE
+    """
     n = z_max - z_min + 1
 
     nSamples = Z.shape[0]
@@ -101,10 +146,6 @@ def getResponseCurve(Z, log_t, smooth_lambda, weighting_func, z_min = 0, z_max =
     A = np.zeros((nSamples * nImages + n + 1, n + nSamples))
     B = np.zeros((A.shape[0], 1))
 
-
-    # Include the data-fitting equations
-
-#    print(Z)
     k = 0
     for i in range(nSamples):
         for j in range(nImages):
@@ -127,19 +168,33 @@ def getResponseCurve(Z, log_t, smooth_lambda, weighting_func, z_min = 0, z_max =
     x = np.linalg.lstsq(A, B)[0]
 
     g = x[:n]
-    #print(g[:, 0] == 0)
-    #print(np.any(g[:, 0] == 0))
+
     return g[:, 0]
 
 
 def getRadianceMap(images, log_t, response_curve, weighting_func):
+    """ Get radiance map for a single channel
+    
+    Args:
+        images (numpy.array((nImages, height, width), dtype=uint8)): 
+            images with different exposures
+        log_t (float): 
+            log of shutter speed
+        response_curve (numpy.array((z_max-z_min+1), dtype=float)): 
+            response curve for this channel that maps z_min ~ z_max to logE
+        weighting_func (function): 
+            decides the weight for each pixel value from different images
+    
+    Returns:
+        numpy.array((height, width), dtype=float): radiance map for a single channel
+    """
     print("Computing radiance map...", end="         ")
-    rows, cols = images[0].shape
-    rad_img = np.zeros((rows, cols))
+    height, width = images[0].shape
+    rad_img = np.zeros((height, width))
     nImages = len(images)
 
-    for r in range(rows):
-        for c in range(cols):
+    for r in range(height):
+        for c in range(width):
             weight = np.array([weighting_func(images[i][r, c]) for i in range(nImages)])
             weight_sum = np.sum(weight)
             log_e = np.array([response_curve[images[i][r, c]] - log_t[i] for i in range(nImages)])
@@ -155,6 +210,22 @@ def getRadianceMap(images, log_t, response_curve, weighting_func):
     return rad_img
 
 def computeHDR(dir_name, imgs, log_t):
+    """ Main function for HDR imaging. 
+        Performs HDR rendering, saves response curve figures, saves .hdr file, 
+        saves pickle file for radiance map and returns it.
+    
+    Args:
+        dir_name (str): 
+            directory name that files will be saved into
+        imgs (numpy.array((nImages, height, width, nChannels), dtype=uint8)): 
+            images used for HDR imaging
+        log_t (float): 
+            log of shutter speed
+    
+    Returns:
+        numpy.array((height, width, nChannels), dtype=float): radiance map
+    """
+
     # resize images
     imgs    = [cv2.resize(img, (0, 0), fx=1/round(max(img.shape)/1000), fy=1/round(max(img.shape)/1000), interpolation=cv2.INTER_AREA) for img in imgs]
     # split into BGR
@@ -168,20 +239,18 @@ def computeHDR(dir_name, imgs, log_t):
         print()
         print("=====", color[i], "=====")
         samples = getSamples(channels[i])
-#       print(log_t)
+
         responseCurve.append(getResponseCurve(samples, log_t, 100, weight))
-#       print(responseCurve[i][128])
+
         plt.plot(responseCurve[i], np.arange(256), c=color[i])
         plt.savefig(f'{dir_name}/curve_{i+1}.png')
         plt.clf()
-#       plt.show(block='false')
+
         rad_img[..., i] = getRadianceMap(channels[i], log_t, responseCurve[i], weight)
         print(rad_img[:, :, i])
         print("max =", np.amax(rad_img[:, :, i]))
         print("min =", np.amin(rad_img[:, :, i]))
-    '''
-    print(rad_img.shape)
-    '''
+
     for i in range(3):
         plt.plot(responseCurve[i], np.arange(256), c=color[i])
     plt.savefig(f'{dir_name}/curve_{4}.png')
@@ -192,33 +261,35 @@ def computeHDR(dir_name, imgs, log_t):
 
     writeHDRFile(rad_img, os.path.join(dir_name, dir_name))
     
-
-    '''
-    for r in range(0, 768, 10):
-        for c in range(0, 502, 20):
-            print(rad_img[r, c:c+5])
-
-    for r in range(0, 768, 10):
-        for c in range(0, 502, 20):
-            print(rad_img[r, c:c+5])
-    '''
-    
     cv2.imwrite(os.path.join(dir_name, dir_name+'.png'), rad_img)
-#    cv2.imshow('image',rad_img)
-#    k = cv2.waitKey(0)
-    cv2.destroyAllWindows()
 
     return rad_img
     
 
 
-### tone mapping ###
+### TONE MAPPING ###
 
-### convert into grey scale ###
 def toGrayScale(color_img):
+    """ Convert color image into greyscale
+    
+    Args:
+        color_img (numpy.array((height, width, 3)))
+    
+    Returns:
+        numpy.array((height, width)): greyscale image
+    """
     return 0.27 * color_img[:, :, 2] + 0.67 * color_img[:, :, 1] + 0.06 * color_img[:, :, 0]
 
 def toLuminance(img, key_value):
+    """ Compute Lw (luminance) and Lm (scaled luminance)
+    
+    Args:
+        img (numpy.array(height, width, 3)): color image
+        key_value (float): user specified scalar
+    
+    Returns:
+        (numpy.array(height, width), numpy.array(height, width)): Lw, Lm
+    """
     delta   = 0.001
     Lw      = toGrayScale(img)
     L_w     = np.log2(delta + Lw)
@@ -233,19 +304,30 @@ def toLuminance(img, key_value):
     return Lw, L_m
 
 def gaussianBlur(img, sigma):
-    #print('max in img:', np.amax(img))
+    """ Generate a gaussian blurred image
+    
+    Args:
+        img (numpy.array(height, width)): greyscale image
+        sigma (float): standard deviation of the gaussian
+    
+    Returns:
+        numpy.array(height, width): a blurred image
+    """
     blurred = gaussian_filter(img, sigma=sigma)
-    #print('max in blurred:', np.amax(blurred))
 
     return blurred
 
 def photographicGlobal(rad_img, key_value = 0.18, multi_value = 1):
-    '''
-    * args *
+    """ Performs global operator on the radiance map
     
-    rad_img:      numpy array with shape (rowls, cols, 3)
-    key_value:    a
-    '''
+    Args:
+        rad_img (numpy.array((height, width, 3)): radiance map
+        key_value (float, optional): a
+        multi_value (int, optional): adjust global luminance
+    
+    Returns:
+        numpy.array((height, width, 3)): a tone-mapped image
+    """
     Lw, L_m = toLuminance(rad_img, key_value)
     L_white = np.amax(L_m)
     L_d     = L_m * (1 + L_m/(L_white ** 2)) / (1 + L_m)
@@ -273,6 +355,17 @@ def photographicGlobal(rad_img, key_value = 0.18, multi_value = 1):
     return tone_mapped_img
 
 def computeV(x, y, gaussian, phi, key_value):
+    """ Compute local luminance and local contrast
+    
+    Args:
+        x, y (int): position of the pixel
+        gaussian (tuple): (s, [blurred_img_alpha1, blurred_img_alpha2])
+        phi (float): user-specified scalar
+        key_value (float): a
+    
+    Returns:
+        TYPE: Description
+    """
     V_i = lambda x, y, i: gaussian[1][i][y][x]
 
     V1 = V_i(x, y, 0)
@@ -282,6 +375,19 @@ def computeV(x, y, gaussian, phi, key_value):
 
 
 def photographicLocal(rad_img, key_value, multi_value, eps, s, phi):
+    """ Performs lobal operator on the radiance map
+    
+    Args:
+        rad_img (numpy.array((height, width, 3)): radiance map
+        key_value (float, optional): a
+        multi_value (int, optional): adjust global luminance
+        eps (float): the threshold for local contrast, user-specified
+        s (float): the initial value for local range
+        phi (float): user-specified scalar
+    
+    Returns:
+        TYPE: Description
+    """
     Lw, L_m = toLuminance(rad_img, key_value)
     maxV1   = np.zeros(Lw.shape)
 
@@ -294,15 +400,15 @@ def photographicLocal(rad_img, key_value, multi_value, eps, s, phi):
         s *= 1.6
 
 
-    for y in tqdm(range(rad_img.shape[0])):
-        for x in range(rad_img.shape[1]):
+    height, width, *rest = rad_img.shape
+    for y in (tqdm(range(height)) if tqdm_exist else range(height)):
+        for x in range(width):
             maxV = Lw[y][x]
             for gaussian in gaussians:
                 delta, V1 = computeV(x, y, gaussian, phi, key_value)
                 if abs(delta) < eps:
                     maxV = V1
                 else:
-                    #print(gaussian[0])
                     break
             maxV1[y][x] = maxV
 
@@ -322,7 +428,3 @@ def photographicLocal(rad_img, key_value, multi_value, eps, s, phi):
     print(Lw[400][400], L_d[400][400])
 
     return tone_mapped_img
-
-
-
-
