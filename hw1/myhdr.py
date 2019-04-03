@@ -364,7 +364,7 @@ def computeV(x, y, gaussian, phi, key_value):
         key_value (float): a
     
     Returns:
-        TYPE: Description
+        (float, float): local luminance and local contrast
     """
     V_i = lambda x, y, i: gaussian[1][i][y][x]
 
@@ -386,7 +386,7 @@ def photographicLocal(rad_img, key_value, multi_value, eps, s, phi):
         phi (float): user-specified scalar
     
     Returns:
-        TYPE: Description
+        numpy.array((height, width, 3)): a tone-mapped image
     """
     Lw, L_m = toLuminance(rad_img, key_value)
     maxV1   = np.zeros(Lw.shape)
