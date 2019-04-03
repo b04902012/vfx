@@ -285,7 +285,7 @@ def toLuminance(img, key_value):
     
     Args:
         img (numpy.array(height, width, 3)): color image
-        key_value (float): user specified scalar
+        key_value (float): user-specified scalar
     
     Returns:
         (numpy.array(height, width), numpy.array(height, width)): Lw, Lm
