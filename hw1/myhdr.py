@@ -323,7 +323,7 @@ def photographicGlobal(rad_img, key_value = 0.18, multi_value = 1):
     Args:
         rad_img (numpy.array((height, width, 3)): radiance map
         key_value (float, optional): a
-        multi_value (int, optional): adjust global luminance
+        multi_value (int, optional): an user-specified scalar to adjust global luminance
     
     Returns:
         numpy.array((height, width, 3)): a tone-mapped image
@@ -380,7 +380,7 @@ def photographicLocal(rad_img, key_value, multi_value, eps, s, phi):
     Args:
         rad_img (numpy.array((height, width, 3)): radiance map
         key_value (float, optional): a
-        multi_value (int, optional): adjust global luminance
+        multi_value (int, optional): an user-specified scalar to adjust global luminance
         eps (float): the threshold for local contrast, user-specified
         s (float): the initial value for local range
         phi (float): user-specified scalar
