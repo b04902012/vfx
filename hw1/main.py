@@ -38,7 +38,7 @@ def readImages(dir_name, txt_name):
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        dir_name = input('Please input image name: ')
+        dir_name = input('Please input image directory path: ')
     else:
         dir_name = sys.argv[1]
 

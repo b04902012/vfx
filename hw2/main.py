@@ -34,11 +34,13 @@ def readImages(dir_name):
 	return imgs
 
 def featureDetection(color_imgs, imgs):
+	# parameters
 	window_size = 5
-	offset = (window_size-1)//2
-	sigma = (window_size+1)/3
 	k = 0.05
 	threshold = 13000000000
+
+	offset = (window_size-1)//2
+	sigma = (window_size+1)/3
 
 	cornerlist = []
 
