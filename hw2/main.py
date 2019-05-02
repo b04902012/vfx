@@ -5,6 +5,7 @@ from numpy import linalg as LA
 import cv2
 
 import getopt
+from tqdm import tqdm
 import sys
 import os
 
@@ -46,13 +47,13 @@ def featureDetection(color_imgs, imgs, window_size=3, k=0.05, threshold=None):
 	g = lambda window: (window*gaussian).sum()
 
 	with open("log", "w") as f:
-		for i, (color_img, img) in enumerate(zip(color_imgs, imgs)):
+		for i, (color_img, img) in enumerate(tqdm(zip(color_imgs, imgs))):
 
 			h, w = img.shape
 
 			#Ix, Iy = np.gradient(img)		# buggy gradient
-			Ix = cv2.Sobel(img, cv2.CV_16S, 1, 0)
-			Iy = cv2.Sobel(img, cv2.CV_16S, 0, 1)
+			Ix = cv2.Sobel(img, cv2.CV_32F, 1, 0)
+			Iy = cv2.Sobel(img, cv2.CV_32F, 0, 1)
 
 			Ixx = Ix**2
 			Iyy = Iy**2
@@ -79,16 +80,17 @@ def featureDetection(color_imgs, imgs, window_size=3, k=0.05, threshold=None):
 						
 			if threshold == None:
 				cornerlist[i].sort()
-				#for j in range(5000):
+				#for j in range(3000):
 				#	print(cornerlist[-i-1][0])
-				cornerlist[i] = [(x, y) for r, (x, y) in cornerlist[i][-5000:]]
+				cornerlist[i] = [(x, y) for r, (x, y) in cornerlist[i][-3000:]]
+
 
 			for x, y in cornerlist[i]:
 				color_img.itemset((x, y, 0), 0)
 				color_img.itemset((x, y, 1), 0)
 				color_img.itemset((x, y, 2), 255)
 			
-			cv2.imwrite(f"final{i}.png", color_img)
+			cv2.imwrite(os.path.join(dir_name, f"feature{i}.png"), color_img)
 
 
 	#print(cornerlist)
