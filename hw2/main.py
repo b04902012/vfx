@@ -8,6 +8,8 @@ import getopt
 from tqdm import tqdm
 import sys
 import os
+import feature_describing
+feature_describing=feature_describing.feature_describing
 
 def readImages(dir_name):
     """
@@ -82,6 +84,9 @@ def featureDetection(color_imgs, imgs, window_size=3, k=0.05, threshold=None):
                     #f.write(str(R)+'\n')
                     
                     if threshold == None:
+                        print(Ix[x][y])
+                        print(Iy[x][y])
+                        print(feature_describing(img,Ix,Iy,[x,y]))
                         cornerlist[i].append((R, (x, y)))
 
                     elif R > threshold:
