@@ -9,7 +9,9 @@ from tqdm import tqdm
 import sys
 import os
 import feature_describing
+import feature_matching
 feature_describing=feature_describing.feature_describing
+feature_matching=feature_matching.feature_matching
 
 def readImages(dir_name):
     """
@@ -51,6 +53,7 @@ def featureDetection(color_imgs, imgs, window_size=3, k=0.05, threshold=None):
     sigma = (window_size+1)/3
 
     cornerlist = [[] for img in imgs]
+    descriptionlist = [[] for img in imgs]
 
     x, y = np.mgrid[-offset:offset+1, -offset:offset+1]
     gaussian = np.exp(-(x**2+y**2)/2/sigma**2)
@@ -84,9 +87,6 @@ def featureDetection(color_imgs, imgs, window_size=3, k=0.05, threshold=None):
                     #f.write(str(R)+'\n')
                     
                     if threshold == None:
-                        print(Ix[x][y])
-                        print(Iy[x][y])
-                        print(feature_describing(img,Ix,Iy,[x,y]))
                         cornerlist[i].append((R, (x, y)))
 
                     elif R > threshold:
@@ -96,8 +96,8 @@ def featureDetection(color_imgs, imgs, window_size=3, k=0.05, threshold=None):
                 cornerlist[i].sort()
                 #for j in range(3000):
                 #   print(cornerlist[-i-1][0])
-                cornerlist[i] = [(x, y) for r, (x, y) in cornerlist[i][-3000:]]
-
+                cornerlist[i] = [(x, y) for r, (x, y) in cornerlist[i][-500:]]
+                descriptionlist[i] = [feature_describing(img, Ix, Iy, (x,y)) for (x,y) in cornerlist[i]]
 
             for x, y in cornerlist[i]:
                 color_img.itemset((x, y, 0), 0)
@@ -106,7 +106,7 @@ def featureDetection(color_imgs, imgs, window_size=3, k=0.05, threshold=None):
             
             cv2.imwrite(os.path.join(dir_name, f"feature{i}.png"), color_img)
 
-    return cornerlist
+    return descriptionlist
 
 
 
@@ -119,9 +119,8 @@ if __name__ == "__main__":
         sys.exit('Please provide directory name with -f or --file.')
 
     color_imgs = readImages(dir_name)
+    color_imgs = color_imgs[:3]
     gray_imgs = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in color_imgs]
 
-    keypoints = featureDetection(color_imgs, gray_imgs)
-    #featureMatching(keypoints)
-
-
+    descriptionlist = featureDetection(color_imgs, gray_imgs)
+    print(feature_matching(descriptionlist))
