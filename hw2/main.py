@@ -10,8 +10,10 @@ import sys
 import os
 import feature_describing
 import feature_matching
+import image_matching
 feature_describing=feature_describing.feature_describing
 feature_matching=feature_matching.feature_matching
+image_matching=image_matching.image_matching
 
 def readImages(dir_name):
     """
@@ -96,7 +98,7 @@ def featureDetection(color_imgs, imgs, window_size=3, k=0.05, threshold=None):
                 cornerlist[i].sort()
                 #for j in range(3000):
                 #   print(cornerlist[-i-1][0])
-                cornerlist[i] = [(x, y) for r, (x, y) in cornerlist[i][-500:]]
+                cornerlist[i] = [(x, y) for r, (x, y) in cornerlist[i][-5000:]]
                 descriptionlist[i] = [feature_describing(img, Ix, Iy, (x,y)) for (x,y) in cornerlist[i]]
 
             for x, y in cornerlist[i]:
@@ -106,7 +108,7 @@ def featureDetection(color_imgs, imgs, window_size=3, k=0.05, threshold=None):
             
             cv2.imwrite(os.path.join(dir_name, f"feature{i}.png"), color_img)
 
-    return descriptionlist
+    return cornerlist, descriptionlist
 
 
 
@@ -119,8 +121,31 @@ if __name__ == "__main__":
         sys.exit('Please provide directory name with -f or --file.')
 
     color_imgs = readImages(dir_name)
-    color_imgs = color_imgs[:3]
+    color_imgs = color_imgs[:2]
     gray_imgs = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in color_imgs]
 
-    descriptionlist = featureDetection(color_imgs, gray_imgs)
-    print(feature_matching(descriptionlist))
+    cornerlist, descriptionlist = featureDetection(color_imgs, gray_imgs)
+    print("matching......")
+    for i in range(0,len(gray_imgs)):
+      for j in range(i+1,len(gray_imgs)):
+        index_pairs = feature_matching(descriptionlist[i],descriptionlist[j])
+        x,y = cornerlist[i][index_pairs[1][0]]
+        print(x,y)
+        color_imgs[i].itemset((x, y, 0), 255)
+        color_imgs[i].itemset((x, y, 1), 0)
+        color_imgs[i].itemset((x, y, 2), 0)
+        x,y = cornerlist[j][index_pairs[1][1]]
+        print(x,y)
+        color_imgs[j].itemset((x, y, 0), 255)
+        color_imgs[j].itemset((x, y, 1), 0)
+        color_imgs[j].itemset((x, y, 2), 0)
+        cv2.imwrite("test0.png", color_imgs[i])
+        cv2.imwrite("test1.png", color_imgs[j])
+        index_set1 = [pair[0] for pair in index_pairs]
+        index_set2 = [pair[1] for pair in index_pairs]
+        transform_matrix = image_matching([cornerlist[i][index] for index in index_set1],[cornerlist[j][index] for index in index_set2])
+        print(transform_matrix)
+        print(gray_imgs[i].shape)
+        img1 = np.transpose(cv2.warpAffine(src = np.transpose(gray_imgs[i]), M = transform_matrix, dsize = (gray_imgs[i].shape[0],gray_imgs[i].shape[1])))
+        cv2.imwrite("test0.png", img1)
+        cv2.imwrite("test1.png", gray_imgs[j])

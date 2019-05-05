@@ -45,4 +45,4 @@ def feature_describing(image, Ix, Iy, coordinate, window_size=8):
           sub_orientation[sub_idx * 8 + idx] += np.linalg.norm(g)
   if(np.linalg.norm(sub_orientation) > 0.0):
     sub_orientation /= np.linalg.norm(sub_orientation)
-  return [coordinate,main_orientation,sub_orientation]
+  return sub_orientation
