@@ -75,6 +75,8 @@ def featureDetection(color_imgs, imgs, window_size=3, k=0.05, threshold=None):
             Iyy = Iy**2
             Ixy = Ix*Iy
 
+            R = np.zeros(img.shape)
+
             for x in range(2*offset, h-2*offset):
                 for y in range(2*offset, w-2*offset):
                     M = np.array(   ((g(Ixx[x-offset:x+offset+1, y-offset:y+offset+1]),
@@ -84,22 +86,21 @@ def featureDetection(color_imgs, imgs, window_size=3, k=0.05, threshold=None):
                     
                     eigs = LA.eigvals(M)
 
-                    R = eigs[0]*eigs[1] - k*((eigs[0]+eigs[1])**2)
+                    R[x][y] = eigs[0]*eigs[1] - k*((eigs[0]+eigs[1])**2)
 
                     #f.write(str(R)+'\n')
-                    
-                    if threshold == None:
-                        cornerlist[i].append((R, (x, y)))
-
-                    elif R > threshold:
-                        cornerlist[i].append((x, y))
+            cornerlist[i] = [(R[x][y], (x, y)) for x in range(2*offset, h-2*offset) for y in range(2*offset, w-2*offset)]
                         
             if threshold == None:
                 cornerlist[i].sort()
                 #for j in range(3000):
                 #   print(cornerlist[-i-1][0])
                 cornerlist[i] = [(x, y) for r, (x, y) in cornerlist[i][-5000:]]
-                descriptionlist[i] = [feature_describing(img, Ix, Iy, (x,y)) for (x,y) in cornerlist[i]]
+
+            else:
+                cornerlist[i] = [(x, y) for r, (x, y) in cornerlist[i] if r >= threshold]
+
+            descriptionlist[i] = [feature_describing(img, Ix, Iy, (x, y)) for (x, y) in cornerlist[i]]
 
             for x, y in cornerlist[i]:
                 color_img.itemset((x, y, 0), 0)
