@@ -3,17 +3,21 @@
 import numpy as np
 from numpy import linalg as LA
 import cv2
+from scipy.ndimage import gaussian_filter
 
 import getopt
 from tqdm import tqdm
+
 import sys
 import os
+
 import feature_describing
 import feature_matching
 import image_matching
 feature_describing=feature_describing.feature_describing
 feature_matching=feature_matching.feature_matching
 image_matching=image_matching.image_matching
+
 
 def readImages(dir_name):
     """
@@ -36,7 +40,7 @@ def readImages(dir_name):
 
     return imgs
 
-def featureDetection(color_imgs, imgs, window_size=3, k=0.05, threshold=None):
+def featureDetection(color_imgs, imgs, window_size=3, k=0.05, threshold=None, local=False):
     """
     Detect features and return (x, y) coordinates of keypoints.
     Saving new images with red dots highlighting the keypoints.
@@ -46,7 +50,8 @@ def featureDetection(color_imgs, imgs, window_size=3, k=0.05, threshold=None):
         imgs: gray images for detecting features
         window_size (int): window size of the gaussian filter
         k (float): recommended value 0.04 ~ 0.06
-        threshold: set threshold for keypoints, if None then output first 3000 keypoints
+        threshold: set threshold for keypoints, if None then output first 5000 keypoints
+        local: output local keypoints instead of global keypoints if it is set to True
     
     Returns:
         list of list of tuples (coordinates of the detected keypoints in each image)
@@ -87,10 +92,15 @@ def featureDetection(color_imgs, imgs, window_size=3, k=0.05, threshold=None):
                     eigs = LA.eigvals(M)
 
                     R[x][y] = eigs[0]*eigs[1] - k*((eigs[0]+eigs[1])**2)
-
-                    #f.write(str(R)+'\n')
+            
+            if local:
+                blurred_R = gaussian_filter(R, sigma=sigma)
+                R = blurred_R-R
+            
+            print(R)
             cornerlist[i] = [(R[x][y], (x, y)) for x in range(2*offset, h-2*offset) for y in range(2*offset, w-2*offset)]
-                        
+
+
             if threshold == None:
                 cornerlist[i].sort()
                 #for j in range(3000):
@@ -114,18 +124,22 @@ def featureDetection(color_imgs, imgs, window_size=3, k=0.05, threshold=None):
 
 
 if __name__ == "__main__":
-    args, ignore = getopt.getopt(sys.argv[1:], "f:w:", ["file=", "window="])
+    args, ignore = getopt.getopt(sys.argv[1:], "f:w:t:l", ["file=", "window=", "local", "threshold"])
     args = dict(args)
 
     dir_name = args.get('-f') or args.get('--file')
     if not dir_name:
         sys.exit('Please provide directory name with -f or --file.')
 
+    local = ('-l' in args or '--local' in args)
+
+    threshold = int(args.get('-t') or args.get('--threshold'))
+
     color_imgs = readImages(dir_name)
     color_imgs = color_imgs[:2]
     gray_imgs = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in color_imgs]
 
-    cornerlist, descriptionlist = featureDetection(color_imgs, gray_imgs)
+    cornerlist, descriptionlist = featureDetection(color_imgs, gray_imgs, threshold=threshold, local=local)
     print("matching......")
     for i in range(0,len(gray_imgs)):
       for j in range(i+1,len(gray_imgs)):
