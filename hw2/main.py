@@ -18,6 +18,24 @@ feature_describing=feature_describing.feature_describing
 feature_matching=feature_matching.feature_matching
 image_matching=image_matching.image_matching
 
+def parseArgs():
+    args, ignore = getopt.getopt(sys.argv[1:], "f:w:t:l", ["file=", "window=", "local", "threshold"])
+    args = dict(args)
+
+    dir_name = args.get('-f') or args.get('--file')
+    threshold = args.get('-t') or args.get('--threshold')
+    local = ('-l' in args or '--local' in args)
+
+    if not dir_name:
+        sys.exit('Please provide directory name with -f or --file.')
+
+    if not threshold:
+        sys.exit('Please provide threshold value with -t or --threshold.')
+
+    threshold = int(threshold)
+
+    return dir_name, threshold, local
+
 
 def readImages(dir_name):
     """
@@ -40,7 +58,7 @@ def readImages(dir_name):
 
     return imgs
 
-def featureDetection(color_imgs, imgs, window_size=3, k=0.05, threshold=None, local=False):
+def featureDetection(color_imgs, imgs, window_size=5, k=0.05, threshold=None, local=False):
     """
     Detect features and return (x, y) coordinates of keypoints.
     Saving new images with red dots highlighting the keypoints.
@@ -82,8 +100,8 @@ def featureDetection(color_imgs, imgs, window_size=3, k=0.05, threshold=None, lo
 
             R = np.zeros(img.shape)
 
-            for x in range(2*offset, h-2*offset):
-                for y in range(2*offset, w-2*offset):
+            for x in range(offset, h-offset):
+                for y in range(offset, w-offset):
                     M = np.array(   ((g(Ixx[x-offset:x+offset+1, y-offset:y+offset+1]),
                                      g(Ixy[x-offset:x+offset+1, y-offset:y+offset+1])),
                                     (g(Ixy[x-offset:x+offset+1, y-offset:y+offset+1]),
@@ -94,28 +112,20 @@ def featureDetection(color_imgs, imgs, window_size=3, k=0.05, threshold=None, lo
                     R[x][y] = eigs[0]*eigs[1] - k*((eigs[0]+eigs[1])**2)
             
             if local:
-                blurred_R = gaussian_filter(R, sigma=sigma)
-                R = blurred_R-R
+                cornerlist[i] = [(R[x, y], (x, y)) for x in range(offset, h-offset) for y in range(offset, w-offset) \
+                                    if R[x, y] == np.amax(R[x-offset:x+offset, y-offset:y+offset]) and R[x, y] - np.amin(R[x-offset:x+offset, y-offset:y+offset]) >= threshold]
+
             
-            print(R)
-            cornerlist[i] = [(R[x][y], (x, y)) for x in range(2*offset, h-2*offset) for y in range(2*offset, w-2*offset)]
-
-
-            if threshold == None:
-                cornerlist[i].sort()
-                #for j in range(3000):
-                #   print(cornerlist[-i-1][0])
-                cornerlist[i] = [(x, y) for r, (x, y) in cornerlist[i][-5000:]]
-
-            else:
-                cornerlist[i] = [(x, y) for r, (x, y) in cornerlist[i] if r >= threshold]
-
+            cornerlist[i] = [(x, y) for r, (x, y) in cornerlist[i] if r >= threshold]
+            
             descriptionlist[i] = [feature_describing(img, Ix, Iy, (x, y)) for (x, y) in cornerlist[i]]
 
             for x, y in cornerlist[i]:
                 color_img.itemset((x, y, 0), 0)
                 color_img.itemset((x, y, 1), 0)
                 color_img.itemset((x, y, 2), 255)
+
+            print(len(cornerlist[i]))
             
             cv2.imwrite(os.path.join(dir_name, f"feature{i}.png"), color_img)
 
@@ -124,16 +134,7 @@ def featureDetection(color_imgs, imgs, window_size=3, k=0.05, threshold=None, lo
 
 
 if __name__ == "__main__":
-    args, ignore = getopt.getopt(sys.argv[1:], "f:w:t:l", ["file=", "window=", "local", "threshold"])
-    args = dict(args)
-
-    dir_name = args.get('-f') or args.get('--file')
-    if not dir_name:
-        sys.exit('Please provide directory name with -f or --file.')
-
-    local = ('-l' in args or '--local' in args)
-
-    threshold = int(args.get('-t') or args.get('--threshold'))
+    dir_name, threshold, local = parseArgs()
 
     color_imgs = readImages(dir_name)
     color_imgs = color_imgs[:2]
