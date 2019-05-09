@@ -110,10 +110,11 @@ def featureDetection(color_imgs, imgs, window_size=5, k=0.05, threshold=None, lo
                     eigs = LA.eigvals(M)
 
                     R[x][y] = eigs[0]*eigs[1] - k*((eigs[0]+eigs[1])**2)
+
+            cornerlist[i] = [(R[x, y], (x, y)) for x in range(offset, h-offset) for y in range(offset, w-offset)]
             
             if local:
-                cornerlist[i] = [(R[x, y], (x, y)) for x in range(offset, h-offset) for y in range(offset, w-offset) \
-                                    if R[x, y] == np.amax(R[x-offset:x+offset, y-offset:y+offset]) and R[x, y] - np.amin(R[x-offset:x+offset, y-offset:y+offset]) >= threshold]
+                cornerlist[i] = [(r, (x, y)) for (r, (x, y)) in cornerlist[i] if r == np.amax(R[x-offset:x+offset, y-offset:y+offset]) and r - np.amin(R[x-offset:x+offset, y-offset:y+offset]) >= threshold]
 
             
             cornerlist[i] = [(x, y) for r, (x, y) in cornerlist[i] if r >= threshold]
