@@ -7,10 +7,12 @@ def transform(transform_matrix, coordinate):
 def image_matching(coordinate_set1,coordinate_set2):
   min_outlier = len(coordinate_set1)
   print(len(coordinate_set1))
-  min_transform_matrix = np.zeros((3,3))
+  min_transform_matrix = np.identity(3)
   for t in range(6000):
-    indices = random.sample(range(0,len(coordinate_set1)),4)
-    transform_matrix = cv2.getPerspectiveTransform(np.float32([coordinate_set2[index] for index in indices]),np.float32([coordinate_set1[index] for index in indices]))
+    transform_matrix = np.identity(3)
+    index = random.sample(range(0,len(coordinate_set1)),1)[0]
+    transform_matrix[0][2] = coordinate_set1[index][0]-coordinate_set2[index][0]
+    transform_matrix[1][2] = coordinate_set1[index][1]-coordinate_set2[index][1]
     outlier = 0
     for i in range(len(coordinate_set1)):
       original_coordinate = np.array(coordinate_set1[i])
