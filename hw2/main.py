@@ -167,11 +167,11 @@ if __name__ == "__main__":
           img1 = np.transpose(cv2.warpPerspective(src = np.transpose(gray_imgs[i+1]), M = cur_transform, dsize = (gray_imgs[i].shape[0],5*gray_imgs[i].shape[1])))
           cv2.imwrite(os.path.join(dir_name, f"test{i+1}.png"), img1)
         
-        with open("transform", "w") as f:
+        with open("transform", "wb") as f:
             pickle.dump(transforms, f)
 
     else:
-        with open("transform", "r") as f:
+        with open("transform", "rb") as f:
             transforms = pickle.load(f)
     
     pano = image_blending(color_imgs, transforms)
