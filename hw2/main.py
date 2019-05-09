@@ -137,31 +137,18 @@ if __name__ == "__main__":
     dir_name, threshold, local = parseArgs()
 
     color_imgs = readImages(dir_name)
-    color_imgs = color_imgs[:2]
+    color_imgs = color_imgs[:5:-1]
     gray_imgs = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in color_imgs]
 
     cornerlist, descriptionlist = featureDetection(color_imgs, gray_imgs, threshold=threshold, local=local)
     print("matching......")
-    for i in range(0,len(gray_imgs)):
-      for j in range(i+1,len(gray_imgs)):
-        index_pairs = feature_matching(descriptionlist[i],descriptionlist[j])
-        x,y = cornerlist[i][index_pairs[1][0]]
-        print(x,y)
-        color_imgs[i].itemset((x, y, 0), 255)
-        color_imgs[i].itemset((x, y, 1), 0)
-        color_imgs[i].itemset((x, y, 2), 0)
-        x,y = cornerlist[j][index_pairs[1][1]]
-        print(x,y)
-        color_imgs[j].itemset((x, y, 0), 255)
-        color_imgs[j].itemset((x, y, 1), 0)
-        color_imgs[j].itemset((x, y, 2), 0)
-        cv2.imwrite("test0.png", color_imgs[i])
-        cv2.imwrite("test1.png", color_imgs[j])
-        index_set1 = [pair[0] for pair in index_pairs]
-        index_set2 = [pair[1] for pair in index_pairs]
-        transform_matrix = image_matching([cornerlist[i][index] for index in index_set1],[cornerlist[j][index] for index in index_set2])
-        print(transform_matrix)
-        print(gray_imgs[i].shape)
-        img1 = np.transpose(cv2.warpAffine(src = np.transpose(gray_imgs[i]), M = transform_matrix, dsize = (gray_imgs[i].shape[0],gray_imgs[i].shape[1])))
-        cv2.imwrite("test0.png", img1)
-        cv2.imwrite("test1.png", gray_imgs[j])
+    cur_transform = np.identity(3)
+    for i in range(0,len(gray_imgs)-1):
+      index_pairs = feature_matching(descriptionlist[i],descriptionlist[i+1])
+      index_set1 = [pair[0] for pair in index_pairs]
+      index_set2 = [pair[1] for pair in index_pairs]
+      transform_matrix = image_matching([cornerlist[i][index] for index in index_set1],[cornerlist[i+1][index] for index in index_set2])
+      cur_transform = np.matmul(cur_transform, transform_matrix)
+      print(gray_imgs[i].shape)
+      img1 = np.transpose(cv2.warpPerspective(src = np.transpose(gray_imgs[i+1]), M = cur_transform, dsize = (gray_imgs[i].shape[0],5*gray_imgs[i].shape[1])))
+      cv2.imwrite(f"test{i+1}.png", img1)
