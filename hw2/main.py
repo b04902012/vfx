@@ -143,7 +143,6 @@ if __name__ == "__main__":
     color_imgs = readImages(dir_name)
     color_imgs = color_imgs[:5]
     color_imgs = color_imgs[::-1]
-
     if not skip:
     #    for i in range(len(color_imgs)):
     #      color_imgs[i] = cylinder_reconstructing(color_imgs[i], 705)
@@ -176,3 +175,4 @@ if __name__ == "__main__":
     
     pano = image_blending(color_imgs, transforms)
     cv2.imwrite(os.path.join(dir_name, "mypano.png"), pano)
+>>>>>>> d1d9c05eb94386b4107f1ab17544a05d4a71eedd
