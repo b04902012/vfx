@@ -10,23 +10,22 @@ from tqdm import tqdm
 
 import sys
 import os
+import pickle
 
-import feature_describing
-import feature_matching
-import image_matching
-import cylinder_reconstructing
-feature_describing=feature_describing.feature_describing
-feature_matching=feature_matching.feature_matching
-image_matching=image_matching.image_matching
-cylinder_reconstructing = cylinder_reconstructing.cylinder_reconstructing
+from feature_describing import feature_describing
+from feature_matching import feature_matching
+from image_matching import image_matching
+from cylinder_reconstructing import cylinder_reconstructing
+from image_blending import image_blending
 
 def parseArgs():
-    args, ignore = getopt.getopt(sys.argv[1:], "f:w:t:l", ["file=", "window=", "local", "threshold"])
+    args, ignore = getopt.getopt(sys.argv[1:], "f:w:t:l", ["file=", "window=", "local", "threshold", "skip"])
     args = dict(args)
 
     dir_name = args.get('-f') or args.get('--file')
     threshold = args.get('-t') or args.get('--threshold')
     local = ('-l' in args or '--local' in args)
+    skip = '--skip' in args
 
     if not dir_name:
         sys.exit('Please provide directory name with -f or --file.')
@@ -36,7 +35,7 @@ def parseArgs():
 
     threshold = int(threshold)
 
-    return dir_name, threshold, local
+    return dir_name, threshold, local, skip
 
 
 def readImages(dir_name):
@@ -114,10 +113,11 @@ def featureDetection(color_imgs, imgs, window_size=5, k=0.05, threshold=None, lo
                     eigs = LA.eigvals(M)
 
                     R[x][y] = eigs[0]*eigs[1] - k*((eigs[0]+eigs[1])**2)
+
+            cornerlist[i] = [(R[x, y], (x, y)) for x in range(offset, h-offset) for y in range(offset, w-offset)]
             
             if local:
-                cornerlist[i] = [(R[x, y], (x, y)) for x in range(offset, h-offset) for y in range(offset, w-offset) \
-                                    if R[x, y] == np.amax(R[x-offset:x+offset, y-offset:y+offset]) and R[x, y] - np.amin(R[x-offset:x+offset, y-offset:y+offset]) >= threshold]
+                cornerlist[i] = [(r, (x, y)) for (r, (x, y)) in cornerlist[i] if r == np.amax(R[x-offset:x+offset, y-offset:y+offset]) and r - np.amin(R[x-offset:x+offset, y-offset:y+offset]) >= threshold]
 
             
             cornerlist[i] = [(x, y) for r, (x, y) in cornerlist[i] if r >= threshold]
@@ -138,24 +138,41 @@ def featureDetection(color_imgs, imgs, window_size=5, k=0.05, threshold=None, lo
 
 
 if __name__ == "__main__":
-    dir_name, threshold, local = parseArgs()
+    dir_name, threshold, local, skip = parseArgs()
 
     color_imgs = readImages(dir_name)
     color_imgs = color_imgs[:5]
     color_imgs = color_imgs[::-1]
-    for i in range(len(color_imgs)):
-      color_imgs[i] = cylinder_reconstructing(color_imgs[i], 702)
-    gray_imgs = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in color_imgs]
+    if not skip:
+    #    for i in range(len(color_imgs)):
+    #      color_imgs[i] = cylinder_reconstructing(color_imgs[i], 705)
+        gray_imgs = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in color_imgs]
 
-    cornerlist, descriptionlist = featureDetection(color_imgs, gray_imgs, threshold=threshold, local=local)
-    print("matching......")
-    cur_transform = np.identity(3)
-    for i in range(0,len(gray_imgs)-1):
-      index_pairs = feature_matching(descriptionlist[i],descriptionlist[i+1])
-      index_set1 = [pair[0] for pair in index_pairs]
-      index_set2 = [pair[1] for pair in index_pairs]
-      transform_matrix = image_matching([cornerlist[i][index] for index in index_set1],[cornerlist[i+1][index] for index in index_set2])
-      cur_transform = np.matmul(cur_transform, transform_matrix)
-      print(gray_imgs[i].shape)
-      img1 = np.transpose(cv2.warpPerspective(src = np.transpose(gray_imgs[i+1]), M = cur_transform, dsize = (gray_imgs[i].shape[0],5*gray_imgs[i].shape[1])))
-      cv2.imwrite(f"parrington/test{i+1}.png", img1)
+        cornerlist, descriptionlist = featureDetection(color_imgs, gray_imgs, threshold=threshold, local=local)
+        print("matching......")
+
+        transforms = []
+        cur_transform = np.identity(3)
+        transforms.append(cur_transform.copy())
+
+        for i in range(0,len(gray_imgs)-1):
+          index_pairs = feature_matching(descriptionlist[i],descriptionlist[i+1])
+          index_set1 = [pair[0] for pair in index_pairs]
+          index_set2 = [pair[1] for pair in index_pairs]
+          transform_matrix = image_matching([cornerlist[i][index] for index in index_set1],[cornerlist[i+1][index] for index in index_set2])
+          cur_transform = np.matmul(cur_transform, transform_matrix)
+          transforms.append(cur_transform.copy())
+          print(gray_imgs[i].shape)
+          img1 = np.transpose(cv2.warpPerspective(src = np.transpose(gray_imgs[i+1]), M = cur_transform, dsize = (gray_imgs[i].shape[0],5*gray_imgs[i].shape[1])))
+          cv2.imwrite(os.path.join(dir_name, f"test{i+1}.png"), img1)
+        
+        with open("transform", "wb") as f:
+            pickle.dump(transforms, f)
+
+    else:
+        with open("transform", "rb") as f:
+            transforms = pickle.load(f)
+    
+    pano = image_blending(color_imgs, transforms)
+    cv2.imwrite(os.path.join(dir_name, "mypano.png"), pano)
+>>>>>>> d1d9c05eb94386b4107f1ab17544a05d4a71eedd
