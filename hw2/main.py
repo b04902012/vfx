@@ -14,9 +14,11 @@ import os
 import feature_describing
 import feature_matching
 import image_matching
+import cylinder_reconstructing
 feature_describing=feature_describing.feature_describing
 feature_matching=feature_matching.feature_matching
 image_matching=image_matching.image_matching
+cylinder_reconstructing = cylinder_reconstructing.cylinder_reconstructing
 
 def parseArgs():
     args, ignore = getopt.getopt(sys.argv[1:], "f:w:t:l", ["file=", "window=", "local", "threshold"])
@@ -91,8 +93,10 @@ def featureDetection(color_imgs, imgs, window_size=5, k=0.05, threshold=None, lo
             h, w = img.shape
 
             #Ix, Iy = np.gradient(img)      # buggy gradient
-            Ix = cv2.Sobel(img, cv2.CV_32F, 1, 0)
-            Iy = cv2.Sobel(img, cv2.CV_32F, 0, 1)
+            print(img)
+            print(i)
+            Ix = cv2.Sobel(img, cv2.CV_64F, 1, 0)
+            Iy = cv2.Sobel(img, cv2.CV_64F, 0, 1)
 
             Ixx = Ix**2
             Iyy = Iy**2
@@ -137,7 +141,10 @@ if __name__ == "__main__":
     dir_name, threshold, local = parseArgs()
 
     color_imgs = readImages(dir_name)
-    color_imgs = color_imgs[:5:-1]
+    color_imgs = color_imgs[:5]
+    color_imgs = color_imgs[::-1]
+#    for i in range(len(color_imgs)):
+#      color_imgs[i] = cylinder_reconstructing(color_imgs[i], 705)
     gray_imgs = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in color_imgs]
 
     cornerlist, descriptionlist = featureDetection(color_imgs, gray_imgs, threshold=threshold, local=local)
@@ -151,4 +158,4 @@ if __name__ == "__main__":
       cur_transform = np.matmul(cur_transform, transform_matrix)
       print(gray_imgs[i].shape)
       img1 = np.transpose(cv2.warpPerspective(src = np.transpose(gray_imgs[i+1]), M = cur_transform, dsize = (gray_imgs[i].shape[0],5*gray_imgs[i].shape[1])))
-      cv2.imwrite(f"test{i+1}.png", img1)
+      cv2.imwrite(f"parrington/test{i+1}.png", img1)
