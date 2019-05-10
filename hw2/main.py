@@ -126,7 +126,7 @@ def featureDetection(color_imgs, imgs, window_size=5, k=0.05, threshold=None, lo
             cornerlist[i] = [(x, y) for r, (x, y) in cornerlist[i] if r >= threshold]
             
             descriptionlist[i] = [feature_describing(img, Ix, Iy, (x, y)) for (x, y) in cornerlist[i]]
-
+            """
             for x, y in cornerlist[i]:
                 color_img.itemset((x, y, 0), 0)
                 color_img.itemset((x, y, 1), 0)
@@ -135,7 +135,7 @@ def featureDetection(color_imgs, imgs, window_size=5, k=0.05, threshold=None, lo
             print(len(cornerlist[i]))
             
             cv2.imwrite(os.path.join(dir_name, f"feature{i}.png"), color_img)
-
+            """
     return cornerlist, descriptionlist
 
 
@@ -148,7 +148,7 @@ if __name__ == "__main__":
 #    color_imgs = color_imgs[::-1]
     if not skip:
         for i in range(len(color_imgs)):
-          color_imgs[i] = cylinder_reconstructing(color_imgs[i], 705)
+            color_imgs[i] = cylinder_reconstructing(color_imgs[i], 1948)
         gray_imgs = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in color_imgs]
 
         cornerlist, descriptionlist = featureDetection(color_imgs, gray_imgs, threshold=threshold, local=local)
