@@ -148,7 +148,7 @@ if __name__ == "__main__":
 #    color_imgs = color_imgs[::-1]
     if not skip:
         for i in range(len(color_imgs)):
-            color_imgs[i] = cylinder_reconstructing(color_imgs[i], 1948)
+            color_imgs[i] = cylinder_reconstructing(color_imgs[i], 705)
         gray_imgs = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in color_imgs]
 
         cornerlist, descriptionlist = featureDetection(color_imgs, gray_imgs, threshold=threshold, local=local)
