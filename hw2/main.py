@@ -172,7 +172,7 @@ if __name__ == "__main__":
     else:
         with open("transform", "rb") as f:
             transforms = pickle.load(f)
+        #print(transforms)
     
     pano = image_blending(color_imgs, transforms)
     cv2.imwrite(os.path.join(dir_name, "mypano.png"), pano)
->>>>>>> d1d9c05eb94386b4107f1ab17544a05d4a71eedd
