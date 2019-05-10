@@ -52,7 +52,7 @@ def readImages(dir_name):
     
     imgs = []
     with open(os.path.join(dir_name, "pano.txt")) as f:
-        for image_name in f.readlines()[::13]:
+        for image_name in f.readlines()[::1]:
             full_name = os.path.join(dir_name, image_name.strip())
             print('  -', full_name)
 #            imgs.append(cv2.imread(full_name))
@@ -169,11 +169,11 @@ if __name__ == "__main__":
           img1 = np.transpose(cv2.warpPerspective(src = np.transpose(gray_imgs[i+1]), M = cur_transform, dsize = (gray_imgs[i].shape[0],5*gray_imgs[i].shape[1])))
           cv2.imwrite(os.path.join(dir_name, f"test{i+1}.png"), img1)
         
-        with open("transform", "wb") as f:
+        with open(os.path.join(dir_name, "transform"), "wb") as f:
             pickle.dump(transforms, f)
 
     else:
-        with open("transform", "rb") as f:
+        with open(os.path.join(dir_name, "transform"), "rb") as f:
             transforms = pickle.load(f)
         #print(transforms)
     
