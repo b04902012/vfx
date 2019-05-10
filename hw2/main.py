@@ -55,7 +55,10 @@ def readImages(dir_name):
         for image_name in f.readlines()[::13]:
             full_name = os.path.join(dir_name, image_name.strip())
             print('  -', full_name)
-            imgs.append(cv2.imread(full_name))
+#            imgs.append(cv2.imread(full_name))
+            img = cv2.imread(full_name)
+            img = cv2.resize(img, (img.shape[1]//10, img.shape[0]//10))
+            imgs.append(img)
 
     return imgs
 
@@ -141,11 +144,11 @@ if __name__ == "__main__":
     dir_name, threshold, local, skip = parseArgs()
 
     color_imgs = readImages(dir_name)
-    color_imgs = color_imgs[:5]
-    color_imgs = color_imgs[::-1]
+    color_imgs = color_imgs[:8]
+#    color_imgs = color_imgs[::-1]
     if not skip:
-    #    for i in range(len(color_imgs)):
-    #      color_imgs[i] = cylinder_reconstructing(color_imgs[i], 705)
+        for i in range(len(color_imgs)):
+          color_imgs[i] = cylinder_reconstructing(color_imgs[i], 705)
         gray_imgs = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in color_imgs]
 
         cornerlist, descriptionlist = featureDetection(color_imgs, gray_imgs, threshold=threshold, local=local)
