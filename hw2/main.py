@@ -54,8 +54,10 @@ def readImages(dir_name, resize=True):
     print('* Reading images...')
     
     imgs = []
+    fls =[]
     with open(os.path.join(dir_name, "pano.txt")) as f:
-        for image_name in f.readlines()[::1]:
+        for image_name in f.readlines()[::13]:
+            image_name = image_name.split('\\')[-1]
             full_name = os.path.join(dir_name, image_name.strip())
             print('  -', full_name)
 #            imgs.append(cv2.imread(full_name))
@@ -63,10 +65,14 @@ def readImages(dir_name, resize=True):
             if resize:
                 img = cv2.resize(img, (img.shape[1]//resize_rate, img.shape[0]//resize_rate))
             imgs.append(img)
+    with open(os.path.join(dir_name, "pano.txt")) as f:
+        for focal_length in f.readlines()[11::13]:
+            fls.append(float(focal_length))
 
-    return imgs
+    imgs = imgs[1:6]
+    return imgs, fls
 
-def featureDetection(color_imgs, imgs, window_size=5, k=0.05, threshold=None, local=False):
+def featureDetection(color_imgs, imgs, window_size=25, k=0.05, threshold=None, local=False):
     """
     Detect features and return (x, y) coordinates of keypoints.
     Saving new images with red dots highlighting the keypoints.
@@ -130,7 +136,6 @@ def featureDetection(color_imgs, imgs, window_size=5, k=0.05, threshold=None, lo
             cornerlist[i] = [(x, y) for r, (x, y) in cornerlist[i] if r >= threshold]
             
             descriptionlist[i] = [feature_describing(img, Ix, Iy, (x, y)) for (x, y) in cornerlist[i]]
-            
             for x, y in cornerlist[i]:
                 color_img.itemset((x, y, 0), 0)
                 color_img.itemset((x, y, 1), 0)
@@ -139,7 +144,6 @@ def featureDetection(color_imgs, imgs, window_size=5, k=0.05, threshold=None, lo
             print(len(cornerlist[i]))
             
             cv2.imwrite(os.path.join(dir_name, f"feature{i}.png"), color_img)
-            
     return cornerlist, descriptionlist
 
 
@@ -147,12 +151,11 @@ def featureDetection(color_imgs, imgs, window_size=5, k=0.05, threshold=None, lo
 if __name__ == "__main__":
     dir_name, threshold, local, skip = parseArgs()
 
-    color_imgs = readImages(dir_name)
-    #color_imgs = color_imgs[:8]
+    color_imgs, focal_lengths = readImages(dir_name)
 #    color_imgs = color_imgs[::-1]
     if not skip:
         for i in range(len(color_imgs)):
-            color_imgs[i] = cylinder_reconstructing(color_imgs[i], 500)
+            color_imgs[i] = cylinder_reconstructing(color_imgs[i], focal_lengths[i])
         gray_imgs = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in color_imgs]
 
         cornerlist, descriptionlist = featureDetection(color_imgs, gray_imgs, threshold=threshold, local=local)
