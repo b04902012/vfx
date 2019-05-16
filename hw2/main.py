@@ -21,27 +21,43 @@ from image_blending import image_blending
 resize_rate = 10
 #resize_rate = 1
 
-def parseArgs():
-    args, ignore = getopt.getopt(sys.argv[1:], "f:w:t:l", ["file=", "window=", "local", "threshold", "skip"])
-    args = dict(args)
+def usage():
+    print()
+    print(f"Usage: python {sys.argv[0]} -f <directory_name> -t <threshold> [-l] [-w window_size] [--skip]")
+    print()
+    print("positional arguments:")
+    print("    -f, --file       <directory_name>", "specifies the image folder you want to process")
+    print("    -l, --threshold  <threshold>     ", "threshold on the level of feature points")
+    print()
+    print("optional arguments:")
+    print("    -h, --help                       ", "show this message")
+    print("    -w, --window     <window_size>   ", "assign window size for gaussian filter used in feature detection")
+    print("    -l, --local                      ", "use local feature points instead of global feature points")
+    print()
 
+def parseArgs():
+    try:
+        args, ignore = getopt.getopt(sys.argv[1:], "f:w:t:lh", ["file=", "window=", "local", "threshold", "skip", "help"])
+    except:
+        usage()
+        sys.exit()
+    args = dict(args)
+    
     dir_name = args.get('-f') or args.get('--file')
     threshold = args.get('-t') or args.get('--threshold')
     local = ('-l' in args or '--local' in args)
     skip = '--skip' in args
 
-    if not dir_name:
-        sys.exit('Please provide directory name with -f or --file.')
-
-    if not threshold:
-        sys.exit('Please provide threshold value with -t or --threshold.')
-
+    if '-h' in args or '--help' in args or not dir_name or not threshold:
+        usage()
+        sys.exit()
+        
     threshold = int(threshold)
 
     return dir_name, threshold, local, skip
 
 
-def readImages(dir_name, resize=True):
+def readImages(dir_name, resize=True, readOri=False):
     """
     Read <dir_name>/pano.txt to find all the images in <dir_name>, return the images
     
@@ -55,7 +71,7 @@ def readImages(dir_name, resize=True):
     
     imgs = []
     fls =[]
-    with open(os.path.join(dir_name, "pano.txt")) as f:
+    with open(os.path.join(dir_name, "pano_original.txt" if readOri else "pano.txt")) as f:
         for image_name in f.readlines()[::13]:
             image_name = image_name.split('\\')[-1]
             full_name = os.path.join(dir_name, image_name.strip())
@@ -69,7 +85,6 @@ def readImages(dir_name, resize=True):
         for focal_length in f.readlines()[11::13]:
             fls.append(float(focal_length))
 
-    imgs = imgs[1:6]
     return imgs, fls
 
 def featureDetection(color_imgs, imgs, window_size=25, k=0.05, threshold=None, local=False):
@@ -136,11 +151,12 @@ def featureDetection(color_imgs, imgs, window_size=25, k=0.05, threshold=None, l
             cornerlist[i] = [(x, y) for r, (x, y) in cornerlist[i] if r >= threshold]
             
             descriptionlist[i] = [feature_describing(img, Ix, Iy, (x, y)) for (x, y) in cornerlist[i]]
+            """
             for x, y in cornerlist[i]:
                 color_img.itemset((x, y, 0), 0)
                 color_img.itemset((x, y, 1), 0)
                 color_img.itemset((x, y, 2), 255)
-
+            """
             print(len(cornerlist[i]))
             
             cv2.imwrite(os.path.join(dir_name, f"feature{i}.png"), color_img)
@@ -151,7 +167,7 @@ def featureDetection(color_imgs, imgs, window_size=25, k=0.05, threshold=None, l
 if __name__ == "__main__":
     dir_name, threshold, local, skip = parseArgs()
 
-    color_imgs, focal_lengths = readImages(dir_name)
+    color_imgs, focal_lengths = readImages(dir_name, resize=False)
 #    color_imgs = color_imgs[::-1]
     if not skip:
         for i in range(len(color_imgs)):
@@ -189,6 +205,6 @@ if __name__ == "__main__":
         #print(transforms)
     
 
-    color_imgs = readImages(dir_name, False)
+    color_imgs = readImages(dir_name, resize=False, readOri=True)
     pano = image_blending(color_imgs, transforms)
     cv2.imwrite(os.path.join(dir_name, f"mypano-{local}-{threshold}.png"), pano)
