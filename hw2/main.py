@@ -18,6 +18,9 @@ from image_matching import image_matching
 from cylinder_reconstructing import cylinder_reconstructing
 from image_blending import image_blending
 
+resize_rate = 10
+#resize_rate = 1
+
 def parseArgs():
     args, ignore = getopt.getopt(sys.argv[1:], "f:w:t:l", ["file=", "window=", "local", "threshold", "skip"])
     args = dict(args)
@@ -38,7 +41,7 @@ def parseArgs():
     return dir_name, threshold, local, skip
 
 
-def readImages(dir_name):
+def readImages(dir_name, resize=True):
     """
     Read <dir_name>/pano.txt to find all the images in <dir_name>, return the images
     
@@ -59,7 +62,8 @@ def readImages(dir_name):
             print('  -', full_name)
 #            imgs.append(cv2.imread(full_name))
             img = cv2.imread(full_name)
-            img = cv2.resize(img, (img.shape[1], img.shape[0]))
+            if resize:
+                img = cv2.resize(img, (img.shape[1]//resize_rate, img.shape[0]//resize_rate))
             imgs.append(img)
     with open(os.path.join(dir_name, "pano.txt")) as f:
         for focal_length in f.readlines()[11::13]:
@@ -171,6 +175,10 @@ if __name__ == "__main__":
           print(gray_imgs[i].shape)
           img1 = np.transpose(cv2.warpPerspective(src = np.transpose(gray_imgs[i+1]), M = cur_transform, dsize = (gray_imgs[i].shape[0],5*gray_imgs[i].shape[1])))
           cv2.imwrite(os.path.join(dir_name, f"test{i+1}.png"), img1)
+    
+        # should add before pickle dump
+        for transform in transforms:
+            transform[0:2, 2] *= resize_rate
         
         with open(os.path.join(dir_name, "transform"), "wb") as f:
             pickle.dump(transforms, f)
@@ -180,6 +188,7 @@ if __name__ == "__main__":
             transforms = pickle.load(f)
         #print(transforms)
     
-    pano = image_blending(color_imgs, transforms)
-    cv2.imwrite(os.path.join(dir_name, "mypano.png"), pano)
 
+    color_imgs = readImages(dir_name, False)
+    pano = image_blending(color_imgs, transforms)
+    cv2.imwrite(os.path.join(dir_name, f"mypano-{local}-{threshold}.png"), pano)
