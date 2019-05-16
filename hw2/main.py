@@ -18,7 +18,7 @@ from image_matching import image_matching
 from cylinder_reconstructing import cylinder_reconstructing
 from image_blending import image_blending
 
-resize_rate = 100
+resize_rate = 10
 #resize_rate = 1
 
 def usage():
