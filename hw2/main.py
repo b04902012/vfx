@@ -18,7 +18,7 @@ from image_matching import image_matching
 from cylinder_reconstructing import cylinder_reconstructing
 from image_blending import image_blending
 
-resize_rate = 10
+resize_rate = 100
 #resize_rate = 1
 
 def usage():
@@ -57,7 +57,7 @@ def parseArgs():
     return dir_name, threshold, local, skip
 
 
-def readImages(dir_name, resize=True, readOri=False):
+def readImages(dir_name):
     """
     Read <dir_name>/pano.txt to find all the images in <dir_name>, return the images
     
@@ -67,19 +67,17 @@ def readImages(dir_name, resize=True, readOri=False):
     Returns:
         list of cv2 color images
     """
-    print('* Reading images...')
+    print('[*] Reading images...')
     
     imgs = []
     fls =[]
-    with open(os.path.join(dir_name, "pano_original.txt" if readOri else "pano.txt")) as f:
+    with open(os.path.join(dir_name, "pano.txt")) as f:
         for image_name in f.readlines()[::13]:
             image_name = image_name.split('\\')[-1]
             full_name = os.path.join(dir_name, image_name.strip())
             print('  -', full_name)
 #            imgs.append(cv2.imread(full_name))
             img = cv2.imread(full_name)
-            if resize:
-                img = cv2.resize(img, (img.shape[1]//resize_rate, img.shape[0]//resize_rate))
             imgs.append(img)
     with open(os.path.join(dir_name, "pano.txt")) as f:
         for focal_length in f.readlines()[11::13]:
@@ -167,15 +165,19 @@ def featureDetection(color_imgs, imgs, window_size=25, k=0.05, threshold=None, l
 if __name__ == "__main__":
     dir_name, threshold, local, skip = parseArgs()
 
-    color_imgs, focal_lengths = readImages(dir_name, resize=False)
-#    color_imgs = color_imgs[::-1]
+    color_imgs, focal_lengths = readImages(dir_name)
+ 
+    print("[*] Cylinder projecting...")
+    for i in range(len(color_imgs)):
+        color_imgs[i] = cylinder_reconstructing(color_imgs[i], focal_lengths[i])
+   
     if not skip:
-        for i in range(len(color_imgs)):
-            color_imgs[i] = cylinder_reconstructing(color_imgs[i], focal_lengths[i])
-        gray_imgs = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in color_imgs]
 
-        cornerlist, descriptionlist = featureDetection(color_imgs, gray_imgs, threshold=threshold, local=local)
-        print("matching......")
+        resized_imgs = [cv2.resize(img, (img.shape[1]//resize_rate, img.shape[0]//resize_rate)) for img in color_imgs]
+        gray_imgs = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in resized_imgs]
+
+        cornerlist, descriptionlist = featureDetection(resized_imgs, gray_imgs, threshold=threshold, local=local)
+        print("[*] Matching......")
 
         transforms = []
         cur_transform = np.identity(3)
@@ -204,7 +206,5 @@ if __name__ == "__main__":
             transforms = pickle.load(f)
         #print(transforms)
     
-
-    color_imgs = readImages(dir_name, resize=False, readOri=True)
     pano = image_blending(color_imgs, transforms)
     cv2.imwrite(os.path.join(dir_name, f"mypano-{local}-{threshold}.png"), pano)

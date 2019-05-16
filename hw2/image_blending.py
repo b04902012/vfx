@@ -6,6 +6,9 @@ def transform(transform_matrix, coordinate):
     return np.array([int(new_coordinate[0]/new_coordinate[2]),int(new_coordinate[1]/new_coordinate[2])])
 
 def image_blending(images, transforms):
+    print(images[0])
+    print(len(images))
+    print(images[1])
     h, w, channels = images[0].shape
     all_h = h+200
     all_w = w*len(images)+50
