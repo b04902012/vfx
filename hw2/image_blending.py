@@ -33,7 +33,7 @@ def image_blending(images, transforms):
 
         #print(xi+max(x1, x3), xi+min(x2, x4), yi+last_y, yi+y3)
         #print(max(x1, x3), min(x2, x4), last_y, y3)
-        outputImage[xi+max(x1, x3, 0):xi+min(x2, x4), yi+last_y:yi+y3] = img[max(x1, x3, 0):min(x2, x4), last_y:y3]
+        outputImage[xi+max(x1, x3, 0):xi+min(x2, x4, h), yi+last_y:yi+y3] = img[max(x1, x3, 0):min(x2, x4, h), last_y:y3]
         last_y = y3
 
     return outputImage[:, :last_y]
