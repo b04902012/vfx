@@ -24,15 +24,16 @@ def image_blending(images, transforms):
 
         this_y = y1
         linear_width = last_y - this_y
+        linear_width = min(linear_width, h//5)
         print(last_y, this_y)
-        
-        for y in range(this_y, last_y):
-            alpha = (y-this_y)/linear_width
+
+        for y in range(last_y-linear_width, last_y):
+            alpha = (y-last_y+linear_width)/linear_width
             outputImage[xi:xi+h, y+yi] = outputImage[xi:xi+h, y+yi]*(1-alpha) + img[:h, y]*alpha
 
         #print(xi+max(x1, x3), xi+min(x2, x4), yi+last_y, yi+y3)
         #print(max(x1, x3), min(x2, x4), last_y, y3)
-        outputImage[xi+max(x1, x3, 0):xi+min(x2, x4, h), yi+last_y:yi+y3] = img[max(x1, x3, 0):min(x2, x4, h), last_y:y3]
+        outputImage[xi+max(x1, x3, 0):xi+min(x2, x4), yi+last_y:yi+y3] = img[max(x1, x3, 0):min(x2, x4), last_y:y3]
         last_y = y3
 
-    return outputImage
+    return outputImage[:, :last_y]

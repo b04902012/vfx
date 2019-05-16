@@ -18,6 +18,9 @@ from image_matching import image_matching
 from cylinder_reconstructing import cylinder_reconstructing
 from image_blending import image_blending
 
+resize_rate = 10
+#resize_rate = 1
+
 def parseArgs():
     args, ignore = getopt.getopt(sys.argv[1:], "f:w:t:l", ["file=", "window=", "local", "threshold", "skip"])
     args = dict(args)
@@ -38,7 +41,7 @@ def parseArgs():
     return dir_name, threshold, local, skip
 
 
-def readImages(dir_name):
+def readImages(dir_name, resize=True):
     """
     Read <dir_name>/pano.txt to find all the images in <dir_name>, return the images
     
@@ -57,7 +60,8 @@ def readImages(dir_name):
             print('  -', full_name)
 #            imgs.append(cv2.imread(full_name))
             img = cv2.imread(full_name)
-            img = cv2.resize(img, (img.shape[1]//10, img.shape[0]//10))
+            if resize:
+                img = cv2.resize(img, (img.shape[1]//resize_rate, img.shape[0]//resize_rate))
             imgs.append(img)
 
     return imgs
@@ -126,7 +130,7 @@ def featureDetection(color_imgs, imgs, window_size=5, k=0.05, threshold=None, lo
             cornerlist[i] = [(x, y) for r, (x, y) in cornerlist[i] if r >= threshold]
             
             descriptionlist[i] = [feature_describing(img, Ix, Iy, (x, y)) for (x, y) in cornerlist[i]]
-            """
+            
             for x, y in cornerlist[i]:
                 color_img.itemset((x, y, 0), 0)
                 color_img.itemset((x, y, 1), 0)
@@ -135,7 +139,7 @@ def featureDetection(color_imgs, imgs, window_size=5, k=0.05, threshold=None, lo
             print(len(cornerlist[i]))
             
             cv2.imwrite(os.path.join(dir_name, f"feature{i}.png"), color_img)
-            """
+            
     return cornerlist, descriptionlist
 
 
@@ -144,11 +148,11 @@ if __name__ == "__main__":
     dir_name, threshold, local, skip = parseArgs()
 
     color_imgs = readImages(dir_name)
-    color_imgs = color_imgs[:8]
+    #color_imgs = color_imgs[:8]
 #    color_imgs = color_imgs[::-1]
     if not skip:
         for i in range(len(color_imgs)):
-            color_imgs[i] = cylinder_reconstructing(color_imgs[i], 705)
+            color_imgs[i] = cylinder_reconstructing(color_imgs[i], 500)
         gray_imgs = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in color_imgs]
 
         cornerlist, descriptionlist = featureDetection(color_imgs, gray_imgs, threshold=threshold, local=local)
@@ -168,6 +172,10 @@ if __name__ == "__main__":
           print(gray_imgs[i].shape)
           img1 = np.transpose(cv2.warpPerspective(src = np.transpose(gray_imgs[i+1]), M = cur_transform, dsize = (gray_imgs[i].shape[0],5*gray_imgs[i].shape[1])))
           cv2.imwrite(os.path.join(dir_name, f"test{i+1}.png"), img1)
+    
+        # should add before pickle dump
+        for transform in transforms:
+            transform[0:2, 2] *= resize_rate
         
         with open(os.path.join(dir_name, "transform"), "wb") as f:
             pickle.dump(transforms, f)
@@ -177,5 +185,7 @@ if __name__ == "__main__":
             transforms = pickle.load(f)
         #print(transforms)
     
+
+    color_imgs = readImages(dir_name, False)
     pano = image_blending(color_imgs, transforms)
-    cv2.imwrite(os.path.join(dir_name, "mypano.png"), pano)
+    cv2.imwrite(os.path.join(dir_name, f"mypano-{local}-{threshold}.png"), pano)
