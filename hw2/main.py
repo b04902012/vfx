@@ -14,7 +14,7 @@ import pickle
 
 from feature_describing import feature_describing
 from feature_matching import feature_matching
-from image_matching_perspective import image_matching
+from image_matching import image_matching
 from cylinder_reconstructing import cylinder_reconstructing
 from image_blending import image_blending
 
@@ -132,10 +132,10 @@ def featureDetection(color_imgs, imgs, window_size=25, k=0.05, threshold=None, l
             cornerlist[i] = [(x, y) for r, (x, y) in cornerlist[i] if r >= threshold]
             
             descriptionlist[i] = [feature_describing(img, Ix, Iy, (x, y)) for (x, y) in cornerlist[i]]
-            '''for x, y in cornerlist[i]:
+            for x, y in cornerlist[i]:
                 color_img.itemset((x, y, 0), 0)
                 color_img.itemset((x, y, 1), 0)
-                color_img.itemset((x, y, 2), 255)'''
+                color_img.itemset((x, y, 2), 255)
 
             print(len(cornerlist[i]))
             
