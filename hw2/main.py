@@ -11,6 +11,7 @@ from tqdm import tqdm
 import sys
 import os
 import pickle
+from multiprocessing import Pool
 
 from feature_describing import feature_describing
 from feature_matching import feature_matching
@@ -18,8 +19,10 @@ from image_matching import image_matching
 from cylinder_reconstructing import cylinder_reconstructing
 from image_blending import image_blending
 
+focal_mul = 5
 resize_rate = 10
 #resize_rate = 1
+gaussain = None
 
 def usage():
     print()
@@ -34,6 +37,9 @@ def usage():
     print("    -w, --window     <window_size>   ", "assign window size for gaussian filter used in feature detection")
     print("    -l, --local                      ", "use local feature points instead of global feature points")
     print()
+
+def g(window):
+    return (window*gaussian).sum()
 
 def parseArgs():
     try:
@@ -51,7 +57,6 @@ def parseArgs():
     if '-h' in args or '--help' in args or not dir_name or not threshold:
         usage()
         sys.exit()
-        
     threshold = int(threshold)
 
     return dir_name, threshold, local, skip
@@ -67,10 +72,9 @@ def readImages(dir_name):
     Returns:
         list of cv2 color images
     """
-    print('[*] Reading images...')
     
     imgs = []
-    fls =[]
+    fls = []
     with open(os.path.join(dir_name, "pano.txt")) as f:
         for image_name in f.readlines()[::13]:
             image_name = image_name.split('\\')[-1]
@@ -79,11 +83,57 @@ def readImages(dir_name):
 #            imgs.append(cv2.imread(full_name))
             img = cv2.imread(full_name)
             imgs.append(img)
-    with open(os.path.join(dir_name, "pano.txt")) as f:
+        f.seek(0)
         for focal_length in f.readlines()[11::13]:
             fls.append(float(focal_length))
 
     return imgs, fls
+
+def feature_detection_for_one(color_img, img, offset, k, threshold, local, idx):
+    h, w = img.shape
+
+    #Ix, Iy = np.gradient(img)      # buggy gradient
+    print(img)
+    Ix = cv2.Sobel(img, cv2.CV_64F, 1, 0)
+    Iy = cv2.Sobel(img, cv2.CV_64F, 0, 1)
+
+    Ixx = Ix**2
+    Iyy = Iy**2
+    Ixy = Ix*Iy
+
+    R = np.zeros(img.shape)
+
+    for x in range(offset, h-offset):
+        for y in range(offset, w-offset):
+            M = np.array(   ((g(Ixx[x-offset:x+offset+1, y-offset:y+offset+1]),
+                         g(Ixy[x-offset:x+offset+1, y-offset:y+offset+1])),
+                        (g(Ixy[x-offset:x+offset+1, y-offset:y+offset+1]),
+                         g(Iyy[x-offset:x+offset+1, y-offset:y+offset+1]))))
+        
+            eigs = LA.eigvals(M)
+
+            R[x, y] = eigs[0]*eigs[1] - k*((eigs[0]+eigs[1])**2)
+
+    corners = [(R[x, y], (x, y)) for x in range(offset, h-offset) for y in range(offset, w-offset)]
+    
+    if local:
+        corners = [(r, (x, y)) for (r, (x, y)) in cornerlist[i] if r == np.amax(R[x-offset:x+offset, y-offset:y+offset]) and r - np.amin(R[x-offset:x+offset, y-offset:y+offset]) >= threshold]
+
+    
+    corners = [(x, y) for r, (x, y) in corners if r >= threshold]
+    
+    descriptions = [feature_describing(img, Ix, Iy, (x, y)) for (x, y) in corners]
+    
+    for x, y in corners:
+        color_img.itemset((x, y, 0), 0)
+        color_img.itemset((x, y, 1), 0)
+        color_img.itemset((x, y, 2), 255)
+
+    cv2.imwrite(os.path.join(dir_name, f"feature{idx+1}.png"), color_img)
+    
+    print(len(corners))
+
+    return corners, descriptions
 
 def featureDetection(color_imgs, imgs, window_size=25, k=0.05, threshold=None, local=False):
     """
@@ -103,64 +153,23 @@ def featureDetection(color_imgs, imgs, window_size=25, k=0.05, threshold=None, l
     """
     offset = (window_size-1)//2
     sigma = (window_size+1)/3
+    n = len(color_imgs)
 
-    cornerlist = [[] for img in imgs]
-    descriptionlist = [[] for img in imgs]
+    #cornerlist = [[] for img in imgs]
+    #descriptionlist = [[] for img in imgs]
 
     x, y = np.mgrid[-offset:offset+1, -offset:offset+1]
-    gaussian = np.exp(-(x**2+y**2)/2/sigma**2)
+    
+    global gaussian
+    gaussian= np.exp(-(x**2+y**2)/2/sigma**2)
 
-    g = lambda window: (window*gaussian).sum()
+    with Pool(n) as pool:
+        featurelist = pool.starmap(feature_detection_for_one, zip(color_imgs, imgs, [offset]*n, [k]*n, [threshold]*n, [local]*n, range(n)))
 
-    with open("log", "w") as f:
-        for i, (color_img, img) in enumerate(tqdm(zip(color_imgs, imgs))):
-
-            h, w = img.shape
-
-            #Ix, Iy = np.gradient(img)      # buggy gradient
-            print(img)
-            print(i)
-            Ix = cv2.Sobel(img, cv2.CV_64F, 1, 0)
-            Iy = cv2.Sobel(img, cv2.CV_64F, 0, 1)
-
-            Ixx = Ix**2
-            Iyy = Iy**2
-            Ixy = Ix*Iy
-
-            R = np.zeros(img.shape)
-
-            for x in range(offset, h-offset):
-                for y in range(offset, w-offset):
-                    #if not local and (R[x-1, y] > threshold or R[x, y-1] > threshold):
-                    #    continue
-                    M = np.array(   ((g(Ixx[x-offset:x+offset+1, y-offset:y+offset+1]),
-                                     g(Ixy[x-offset:x+offset+1, y-offset:y+offset+1])),
-                                    (g(Ixy[x-offset:x+offset+1, y-offset:y+offset+1]),
-                                     g(Iyy[x-offset:x+offset+1, y-offset:y+offset+1]))))
-                    
-                    eigs = LA.eigvals(M)
-
-                    R[x, y] = eigs[0]*eigs[1] - k*((eigs[0]+eigs[1])**2)
-                    
-
-            cornerlist[i] = [(R[x, y], (x, y)) for x in range(offset, h-offset) for y in range(offset, w-offset)]
-            
-            if local:
-                cornerlist[i] = [(r, (x, y)) for (r, (x, y)) in cornerlist[i] if r == np.amax(R[x-offset:x+offset, y-offset:y+offset]) and r - np.amin(R[x-offset:x+offset, y-offset:y+offset]) >= threshold]
+    cornerlist = [feature[0] for feature in featurelist]
+    descriptionlist = [feature[1] for feature in featurelist]
 
             
-            cornerlist[i] = [(x, y) for r, (x, y) in cornerlist[i] if r >= threshold]
-            
-            descriptionlist[i] = [feature_describing(img, Ix, Iy, (x, y)) for (x, y) in cornerlist[i]]
-            
-            for x, y in cornerlist[i]:
-                color_img.itemset((x, y, 0), 0)
-                color_img.itemset((x, y, 1), 0)
-                color_img.itemset((x, y, 2), 255)
-            
-            print(len(cornerlist[i]))
-            
-            cv2.imwrite(os.path.join(dir_name, f"feature{i}.png"), color_img)
     return cornerlist, descriptionlist
 
 
@@ -168,20 +177,27 @@ def featureDetection(color_imgs, imgs, window_size=25, k=0.05, threshold=None, l
 if __name__ == "__main__":
     dir_name, threshold, local, skip = parseArgs()
 
-    color_imgs, focal_lengths = readImages(dir_name)
- 
-    print("[*] Cylinder projecting...")
-    for i in range(len(color_imgs)):
-        color_imgs[i] = cylinder_reconstructing(color_imgs[i], 3*focal_lengths[i])
-        cv2.imwrite(os.path.join(dir_name, f"cylinder{i+1}.png"), color_imgs[i])
-   
-    if not skip:
+    print("\n[*] Reading images...")
+    imgs, focal_lengths = readImages(dir_name)
+    
+    # focal length
+    focal_lengths = [focal_mul*focal for focal in focal_lengths]
 
+    print("\n[*] Cylinder reconstructing...")
+    with Pool(len(imgs)) as pool:
+        color_imgs = pool.starmap(cylinder_reconstructing, zip(imgs, focal_lengths))
+
+    for i in range(len(color_imgs)):
+        cv2.imwrite(os.path.join(dir_name, f"cylinder{i+1}.png"), color_imgs[i])
+    #color_imgs = color_imgs[:8]
+#    color_imgs = color_imgs[::-1]
+    if not skip:
+        
         resized_imgs = [cv2.resize(img, (img.shape[1]//resize_rate, img.shape[0]//resize_rate)) for img in color_imgs]
         gray_imgs = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in resized_imgs]
 
         cornerlist, descriptionlist = featureDetection(resized_imgs, gray_imgs, threshold=threshold, local=local)
-        print("[*] Matching......")
+        print("\n[*] Matching......")
 
         transforms = []
         cur_transform = np.identity(3)
@@ -197,16 +213,15 @@ if __name__ == "__main__":
           print(gray_imgs[i].shape)
           img1 = np.transpose(cv2.warpPerspective(src = np.transpose(gray_imgs[i+1]), M = cur_transform, dsize = (gray_imgs[i].shape[0],5*gray_imgs[i].shape[1])))
           cv2.imwrite(os.path.join(dir_name, f"test{i+1}.png"), img1)
-    
-        # should add before pickle dump
+        
         for transform in transforms:
             transform[0:2, 2] *= resize_rate
-        
-        with open(os.path.join(dir_name, "transform"), "wb") as f:
+            
+        with open(os.path.join(dir_name, f"transform-{local}-{threshold}"), "wb") as f:
             pickle.dump(transforms, f)
 
     else:
-        with open(os.path.join(dir_name, "transform"), "rb") as f:
+        with open(os.path.join(dir_name, f"transform-{local}-{threshold}"), "rb") as f:
             transforms = pickle.load(f)
         #print(transforms)
     
