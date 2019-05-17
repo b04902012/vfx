@@ -29,7 +29,6 @@ def image_blending(images, transforms):
         linear_width = last_y - this_y
         linear_width = min(linear_width, h//5)
         print(last_y, this_y)
-
         for y in range(last_y-linear_width, last_y):
             alpha = (y-last_y+linear_width)/linear_width
             outputImage[xi:xi+h, y+yi] = outputImage[xi:xi+h, y+yi]*(1-alpha) + img[:h, y]*alpha
