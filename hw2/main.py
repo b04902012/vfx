@@ -18,7 +18,7 @@ from image_matching import image_matching
 from cylinder_reconstructing import cylinder_reconstructing
 from image_blending import image_blending
 
-focal_mul = 5
+focal_mul = 3
 resize_rate = 10
 #resize_rate = 1
 
@@ -203,13 +203,13 @@ if __name__ == "__main__":
         for transform in transforms:
             transform[0:2, 2] *= resize_rate
                                 
-        with open(os.path.join(dir_name, f"transform-{local}-{threshold}"), "wb") as f:
+        with open(os.path.join(dir_name, f"transform-{local}-{threshold}-{focal_mul}"), "wb") as f:
             pickle.dump(transforms, f)
 
     else:
-        with open(os.path.join(dir_name, f"transform-{local}-{threshold}"), "rb") as f:
+        with open(os.path.join(dir_name, f"transform-{local}-{threshold}-{focal_mul}"), "rb") as f:
             transforms = pickle.load(f)
         #print(transforms)
     
     pano = image_blending(color_imgs, transforms)
-    cv2.imwrite(os.path.join(dir_name, f"mypano-{local}-{threshold}.png"), pano)
+    cv2.imwrite(os.path.join(dir_name, f"mypano-{local}-{threshold}-{focal_mul}.png"), pano)
