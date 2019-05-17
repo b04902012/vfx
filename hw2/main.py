@@ -18,8 +18,29 @@ from image_matching import image_matching
 from cylinder_reconstructing import cylinder_reconstructing
 from image_blending import image_blending
 
+resize_rate = 10
+#resize_rate = 1
+
+def usage():
+    print()
+    print(f"Usage: python {sys.argv[0]} -f <directory_name> -t <threshold> [-l] [-w window_size] [--skip]")
+    print()
+    print("positional arguments:")
+    print("    -f, --file       <directory_name>", "specifies the image folder you want to process")
+    print("    -l, --threshold  <threshold>     ", "threshold on the level of feature points")
+    print()
+    print("optional arguments:")
+    print("    -h, --help                       ", "show this message")
+    print("    -w, --window     <window_size>   ", "assign window size for gaussian filter used in feature detection")
+    print("    -l, --local                      ", "use local feature points instead of global feature points")
+    print()
+
 def parseArgs():
-    args, ignore = getopt.getopt(sys.argv[1:], "f:w:t:l", ["file=", "window=", "local", "threshold", "skip"])
+    try:
+        args, ignore = getopt.getopt(sys.argv[1:], "f:w:t:lh", ["file=", "window=", "local", "threshold", "skip", "help"])
+    except:
+        usage()
+        sys.exit()
     args = dict(args)
 
     dir_name = args.get('-f') or args.get('--file')
@@ -27,11 +48,9 @@ def parseArgs():
     local = ('-l' in args or '--local' in args)
     skip = '--skip' in args
 
-    if not dir_name:
-        sys.exit('Please provide directory name with -f or --file.')
-
-    if not threshold:
-        sys.exit('Please provide threshold value with -t or --threshold.')
+    if '-h' in args or '--help' in args or not dir_name or not threshold:
+        usage()
+        sys.exit()
 
     threshold = int(threshold)
 
@@ -48,19 +67,22 @@ def readImages(dir_name):
     Returns:
         list of cv2 color images
     """
-    print('* Reading images...')
     
     imgs = []
+    fls = []
     with open(os.path.join(dir_name, "pano.txt")) as f:
-        for image_name in f.readlines()[::1]:
+        for image_name in f.readlines()[::13]:
+            image_name = image_name.split('\\')[-1]
             full_name = os.path.join(dir_name, image_name.strip())
             print('  -', full_name)
 #            imgs.append(cv2.imread(full_name))
             img = cv2.imread(full_name)
-            img = cv2.resize(img, (img.shape[1]//10, img.shape[0]//10))
             imgs.append(img)
+        f.seek(0)
+        for focal_length in f.readlines()[11::13]:
+            fls.append(float(focal_length))
 
-    return imgs
+    return imgs, fls
 
 def featureDetection(color_imgs, imgs, window_size=5, k=0.05, threshold=None, local=False):
     """
@@ -115,7 +137,7 @@ def featureDetection(color_imgs, imgs, window_size=5, k=0.05, threshold=None, lo
                     
                     eigs = LA.eigvals(M)
 
-                    R[x][y] = eigs[0]*eigs[1] - k*((eigs[0]+eigs[1])**2)
+                    R[x, y] = eigs[0]*eigs[1] - k*((eigs[0]+eigs[1])**2)
 
             cornerlist[i] = [(R[x, y], (x, y)) for x in range(offset, h-offset) for y in range(offset, w-offset)]
             
@@ -126,7 +148,7 @@ def featureDetection(color_imgs, imgs, window_size=5, k=0.05, threshold=None, lo
             cornerlist[i] = [(x, y) for r, (x, y) in cornerlist[i] if r >= threshold]
             
             descriptionlist[i] = [feature_describing(img, Ix, Iy, (x, y)) for (x, y) in cornerlist[i]]
-            """
+            
             for x, y in cornerlist[i]:
                 color_img.itemset((x, y, 0), 0)
                 color_img.itemset((x, y, 1), 0)
@@ -135,7 +157,7 @@ def featureDetection(color_imgs, imgs, window_size=5, k=0.05, threshold=None, lo
             print(len(cornerlist[i]))
             
             cv2.imwrite(os.path.join(dir_name, f"feature{i}.png"), color_img)
-            """
+            
     return cornerlist, descriptionlist
 
 
@@ -143,16 +165,21 @@ def featureDetection(color_imgs, imgs, window_size=5, k=0.05, threshold=None, lo
 if __name__ == "__main__":
     dir_name, threshold, local, skip = parseArgs()
 
-    color_imgs = readImages(dir_name)
-    color_imgs = color_imgs[:8]
+    print("\n[*] Reading images...")
+    color_imgs, focal_lengths = readImages(dir_name)
+    #color_imgs = color_imgs[:8]
 #    color_imgs = color_imgs[::-1]
     if not skip:
+        print("\n[*] Cylinder reconstructing...")
         for i in range(len(color_imgs)):
-            color_imgs[i] = cylinder_reconstructing(color_imgs[i], 705)
-        gray_imgs = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in color_imgs]
+            color_imgs[i] = cylinder_reconstructing(color_imgs[i], focal_lengths[i]*3)
+            cv2.imwrite(os.path.join(dir_name, f"cylinder{i+1}.png"), color_imgs[i])
+        
+        resized_imgs = [cv2.resize(img, (img.shape[1]//resize_rate, img.shape[0]//resize_rate)) for img in color_imgs]
+        gray_imgs = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in resized_imgs]
 
-        cornerlist, descriptionlist = featureDetection(color_imgs, gray_imgs, threshold=threshold, local=local)
-        print("matching......")
+        cornerlist, descriptionlist = featureDetection(resized_imgs, gray_imgs, threshold=threshold, local=local)
+        print("\n[*] Matching......")
 
         transforms = []
         cur_transform = np.identity(3)
@@ -178,4 +205,4 @@ if __name__ == "__main__":
         #print(transforms)
     
     pano = image_blending(color_imgs, transforms)
-    cv2.imwrite(os.path.join(dir_name, "mypano.png"), pano)
+    cv2.imwrite(os.path.join(dir_name, f"mypano-{local}-{threshold}.png"), pano)
