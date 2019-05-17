@@ -85,7 +85,7 @@ def readImages(dir_name):
 
     return imgs, fls
 
-def featureDetection(color_imgs, imgs, window_size=5, k=0.05, threshold=None, local=False):
+def featureDetection(color_imgs, imgs, window_size=25, k=0.05, threshold=None, local=False):
     """
     Detect features and return (x, y) coordinates of keypoints.
     Saving new images with red dots highlighting the keypoints.
