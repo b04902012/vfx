@@ -85,7 +85,7 @@ def readImages(dir_name):
 
     return imgs, fls
 
-def featureDetection(color_imgs, imgs, window_size=25, k=0.05, threshold=None, local=False):
+def featureDetection(color_imgs, imgs, window_size=5, k=0.05, threshold=None, local=False):
     """
     Detect features and return (x, y) coordinates of keypoints.
     Saving new images with red dots highlighting the keypoints.
@@ -131,6 +131,8 @@ def featureDetection(color_imgs, imgs, window_size=25, k=0.05, threshold=None, l
 
             for x in range(offset, h-offset):
                 for y in range(offset, w-offset):
+                    #if not local and (R[x-1, y] > threshold or R[x, y-1] > threshold):
+                    #    continue
                     M = np.array(   ((g(Ixx[x-offset:x+offset+1, y-offset:y+offset+1]),
                                      g(Ixy[x-offset:x+offset+1, y-offset:y+offset+1])),
                                     (g(Ixy[x-offset:x+offset+1, y-offset:y+offset+1]),
@@ -138,7 +140,8 @@ def featureDetection(color_imgs, imgs, window_size=25, k=0.05, threshold=None, l
                     
                     eigs = LA.eigvals(M)
 
-                    R[x][y] = eigs[0]*eigs[1] - k*((eigs[0]+eigs[1])**2)
+                    R[x, y] = eigs[0]*eigs[1] - k*((eigs[0]+eigs[1])**2)
+                    
 
             cornerlist[i] = [(R[x, y], (x, y)) for x in range(offset, h-offset) for y in range(offset, w-offset)]
             
@@ -149,12 +152,12 @@ def featureDetection(color_imgs, imgs, window_size=25, k=0.05, threshold=None, l
             cornerlist[i] = [(x, y) for r, (x, y) in cornerlist[i] if r >= threshold]
             
             descriptionlist[i] = [feature_describing(img, Ix, Iy, (x, y)) for (x, y) in cornerlist[i]]
-            """
+            
             for x, y in cornerlist[i]:
                 color_img.itemset((x, y, 0), 0)
                 color_img.itemset((x, y, 1), 0)
                 color_img.itemset((x, y, 2), 255)
-            """
+            
             print(len(cornerlist[i]))
             
             cv2.imwrite(os.path.join(dir_name, f"feature{i}.png"), color_img)
@@ -169,7 +172,8 @@ if __name__ == "__main__":
  
     print("[*] Cylinder projecting...")
     for i in range(len(color_imgs)):
-        color_imgs[i] = cylinder_reconstructing(color_imgs[i], focal_lengths[i])
+        color_imgs[i] = cylinder_reconstructing(color_imgs[i], 3*focal_lengths[i])
+        cv2.imwrite(os.path.join(dir_name, f"cylinder{i+1}.png"), color_imgs[i])
    
     if not skip:
 
